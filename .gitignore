@@ -1,0 +1,8 @@
+.godot/
+.DS_Store
+builds/
+artifacts/
+*.log
+*.import
+export_credentials.cfg
+.vercel/

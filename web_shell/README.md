@@ -1,0 +1,1 @@
+Custom HTML shell for the Godot Web export. Godot copies and substitutes this file during `--export-release Web`; edits here rebuild into `web/index.html`. Loader checks WebGL 2 and shows a readable failure notice instead of a blank page when features are missing.

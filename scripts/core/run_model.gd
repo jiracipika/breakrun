@@ -2,6 +2,8 @@ extends RefCounted
 ## Logical simulation owns hits and score. Rendering reads but never writes it.
 
 const PLAYER_SPEED: float = 9.0
+const MAX_SPEED: float = 14.0
+const HURDLE_BONUS: int = 25
 const SPAWN_DISTANCE: float = 37.0
 const WAVE_SPACING: float = 70.0
 const SHIELD_WARNING_Z: float = 12.0
@@ -87,9 +89,14 @@ func step(delta: float) -> void:
 		_tick(dt)
 		remaining -= dt
 
+## Current forward speed. Grows gently with distance, hard-capped so late runs stay readable.
+func speed() -> float:
+	return minf(PLAYER_SPEED + distance * 0.02, MAX_SPEED)
+
 func _tick(dt: float) -> void:
 	time += dt
-	distance += PLAYER_SPEED * dt
+	var current_speed: float = speed()
+	distance += current_speed * dt
 	_jump = maxf(0.0, _jump - dt)
 	_slide = maxf(0.0, _slide - dt)
 	_invulnerability = maxf(0.0, _invulnerability - dt)
@@ -100,7 +107,7 @@ func _tick(dt: float) -> void:
 		feedback = ""
 	for e in enemies:
 		e["previous_z"] = e.z
-		e.z += (27.0 if e.phase == "launched" else -PLAYER_SPEED) * dt
+		e.z += ((current_speed + 18.0) if e.phase == "launched" else -current_speed) * dt
 		if e.phase == "launched":
 			e["age"] += dt
 		elif e.kind == "shield" and e.phase != "cleared":
@@ -115,9 +122,10 @@ func _tick(dt: float) -> void:
 		if projectile.phase != "launched":
 			continue
 		for target in enemies:
-			if target.phase == "cleared" or target.kind == "shield" or target.lane != projectile.lane:
+			# Hurdles are only cleared by player evasion, never by projectiles.
+			if target.phase == "cleared" or target.kind == "shield" or target.kind == "hurdle" or target.lane != projectile.lane:
 				continue
-			if target.z >= projectile.previous_z - PLAYER_SPEED * dt and target.z <= projectile.z + 0.5:
+			if target.z >= projectile.previous_z - current_speed * dt and target.z <= projectile.z + 0.5:
 				target.phase = "cleared"
 				projectile["hits"] += 1
 				if projectile.hits == 1:
@@ -129,7 +137,15 @@ func _tick(dt: float) -> void:
 		if e.phase == "cleared" or e.phase == "launched":
 			continue
 		if e.z <= 0.8 and e.previous_z >= -0.8 and e.lane == lane:
-			if e.kind == "hurdle" and (height > 0.5 or sliding):
+			if e.kind == "hurdle":
+				# Airborne or sliding passes are intentional evasion, not contact.
+				if height > 0.5 or sliding:
+					if not e["rewarded"]:
+						e["rewarded"] = true
+						e.phase = "cleared"
+						score += HURDLE_BONUS
+						combo += 1
+						_message("Clean!", 0.8)
 				continue
 			if _invulnerability <= 0.0:
 				hp -= 1
@@ -147,11 +163,11 @@ func _tick(dt: float) -> void:
 		_next_wave_distance += WAVE_SPACING
 
 func _spawn_wave(z: float, target_lane: int) -> void:
-	var kinds: Array[String] = ["shield", "dummy", "dummy", "barrier"]
+	var kinds: Array[String] = ["shield", "dummy", "dummy", "barrier", "hurdle"]
 	for i in range(kinds.size()):
 		enemies.append({"id": _next_id, "kind": kinds[i], "lane": target_lane,
 			"z": z + 4.0 * i, "phase": "approach", "dodged": false,
-			"age": 0.0, "hits": 0, "previous_z": z + 4.0 * i})
+			"age": 0.0, "hits": 0, "rewarded": false, "previous_z": z + 4.0 * i})
 		_next_id += 1
 
 func _try_counter() -> void:

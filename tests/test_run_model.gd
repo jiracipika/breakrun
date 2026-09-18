@@ -244,8 +244,8 @@ func _test_large_delta_clamped() -> void:
 	var m = RunModel.new()
 	m.start(42)
 	m.step(100.0)
-	# Should not crash; distance should advance by at most speed * 1.0
-	_assert_eq(m.distance <= 9.0 * 1.0 + 0.001, true, "large delta clamped to 1.0s max")
+	# A 100s clamp now travels at ramped speed, so the assertion must use speed(), not the constant.
+	_assert_eq(m.distance <= m.speed() * 1.0 + 0.001, true, "large delta clamped to 1.0s max")
 	_end_test()
 
 # --- Shield interaction ---

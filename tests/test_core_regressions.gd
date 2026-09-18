@@ -18,16 +18,20 @@ func prepared() -> RefCounted:
 	var model = Model.new()
 	model.start(42)
 	model.act("right")
-	advance(model, 3.6)
+	# Advance to the recovery window itself; a fixed duration overshoots at ramped speed.
+	var waited: float = 0.0
+	while waited < 6.0 and not (model.enemies[0].phase == "recovery" and model.enemies[0].z <= 6.0 and model.enemies[0].z >= 2.0):
+		model.step(1.0 / 120.0)
+		waited += 1.0 / 120.0
 	return model
 
 func _init() -> void:
 	var model = Model.new()
 	model.start(42)
 	model.step(0.0)
-	check(model.enemies.size() == 4, "zero delta cannot create duplicate waves")
+	check(model.enemies.size() == 5, "zero delta cannot create duplicate waves")
 	model.step(1.0 / 60.0)
-	check(model.enemies.size() == 4, "first frame has only the initial four enemies")
+	check(model.enemies.size() == 5, "first frame has only the initial wave")
 	model.act("jump")
 	advance(model, 0.6)
 	check(is_zero_approx(model.height), "jump lands without sinking below roof")
@@ -42,13 +46,16 @@ func _init() -> void:
 	check(model.feedback == success, "repeated attack preserves success feedback")
 	model.step(1.0 / 60.0)
 	check(model.enemies[0].z > start_z, "launched shield travels forward using delta")
-	advance(model, 0.9)
+	var traveled: float = 0.0
+	while traveled < 3.0 and model.chain_count == 0:
+		model.step(1.0 / 120.0)
+		traveled += 1.0 / 120.0
 	check(model.chain_count == 1, "three physically reached targets form one chain")
-	var cleared: int = 0
-	for e in model.enemies:
-		if e.phase == "cleared":
-			cleared += 1
-	check(cleared == 3, "chain clears exactly its two dummies and barricade")
+	# Let the projectile finish sweeping all three targets before asserting the settled score.
+	while traveled < 4.0 and model.feedback_time > 0.0:
+		model.step(1.0 / 120.0)
+		traveled += 1.0 / 120.0
+	check(model.score == 400, "chain clears exactly counter 50 + two dummies 100 + barricade 150")
 	var score_before: int = model.score
 	model.act("attack")
 	check(model.score == score_before, "duplicate attack adds no score")

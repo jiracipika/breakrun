@@ -30,6 +30,13 @@ var kick_timer: float = 0.0
 var previous_counters: int = 0
 var reduced_motion: bool = false
 var _web_status_elapsed: float = 0.0
+var hit_flash: ColorRect
+var hit_flash_time: float = 0.0
+var previous_hp: int = 3
+var best_score: int = 0
+var muted: bool = false
+var audio_players: Dictionary = {}
+var last_sound_feedback: String = ""
 
 
 func _ready() -> void:
@@ -77,6 +84,15 @@ func _ready() -> void:
 	counter_ring.visible = false
 	warning_lane = Art.box(world, Vector3(2.0, 0.025, 5.0), Vector3(0, 0, -4), GOLD)
 	warning_lane.visible = false
+	hit_flash = ColorRect.new()
+	hit_flash.color = Color(Art.CORAL, 0.55)
+	hit_flash.size = Vector2(540, 960)
+	hit_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hit_flash.visible = false
+	interface.add_child(hit_flash)
+	_build_audio()
+	_load_settings()
+	previous_hp = model.hp
 
 func panel(parent: Node, rect: Rect2, color: Color = PANEL) -> Panel:
 	var node := Panel.new()
@@ -169,10 +185,23 @@ func _build_overlays() -> void:
 	var motion := CheckButton.new()
 	motion.text = "Reduced motion"
 	motion.position = Vector2(48, 523)
-	motion.size = Vector2(444, 56)
+	motion.size = Vector2(213, 56)
 	motion.add_theme_font_size_override("font_size", 22)
-	motion.toggled.connect(func(value: bool) -> void: reduced_motion = value)
+	motion.button_pressed = reduced_motion
+	motion.toggled.connect(func(value: bool) -> void:
+		reduced_motion = value
+		_save_settings())
 	pause_overlay.add_child(motion)
+	var sound := CheckButton.new()
+	sound.text = "Sound"
+	sound.position = Vector2(279, 523)
+	sound.size = Vector2(213, 56)
+	sound.add_theme_font_size_override("font_size", 22)
+	sound.button_pressed = not muted
+	sound.toggled.connect(func(value: bool) -> void:
+		muted = not value
+		_save_settings())
+	pause_overlay.add_child(sound)
 	button(pause_overlay, "Back to title", Rect2(48, 615, 444, 60), return_to_title)
 	pause_overlay.visible = false
 	result_overlay = Control.new()
@@ -189,6 +218,7 @@ func start_run() -> void:
 	gestures.cancel()
 	model.start(42)
 	previous_counters = 0
+	previous_hp = 3
 	kick_timer = 0.0
 	for node in enemy_nodes.values():
 		node.free()
@@ -256,10 +286,78 @@ func _notification(what: int) -> void:
 		if model.state == "running":
 			pause_run()
 
+func _build_audio() -> void:
+	# Original procedural blips synthesized at startup. No external audio assets.
+	for name in ["counter", "hit", "chain", "clean"]:
+		var tone: AudioStreamWAV = AudioStreamWAV.new()
+		var rate: int = 22050
+		var length: int = int(rate * 0.18)
+		tone.format = AudioStreamWAV.FORMAT_16_BITS
+		tone.mix_rate = rate
+		var data := PackedByteArray()
+		data.resize(length * 2)
+		var base_frequency: float = 660.0
+		if name == "hit":
+			base_frequency = 130.0
+		elif name == "chain":
+			base_frequency = 440.0
+		elif name == "clean":
+			base_frequency = 880.0
+		for i in range(length):
+			var progress: float = float(i) / length
+			var envelope: float = 1.0 - progress
+			var frequency: float = base_frequency * (1.0 + 0.5 * progress if name == "counter" else 1.0)
+			var sample: float = sin(TAU * frequency * i / rate) * envelope * 0.4
+			var value: int = int(clampf(sample, -1.0, 1.0) * 32767.0)
+			data.encode_s16(i * 2, value)
+		tone.data = data
+		var player := AudioStreamPlayer.new()
+		player.stream = tone
+		player.volume_db = -8.0
+		add_child(player)
+		audio_players[name] = player
+
+func play_sound(name: String) -> void:
+	if not muted and audio_players.has(name):
+		audio_players[name].play()
+
+func _settings_path() -> String:
+	return "user://breakrun.cfg"
+
+func _load_settings() -> void:
+	var config := ConfigFile.new()
+	if config.load(_settings_path()) == OK:
+		best_score = int(config.get_value("run", "best_score", 0))
+		muted = bool(config.get_value("options", "muted", false))
+		reduced_motion = bool(config.get_value("options", "reduced_motion", false))
+
+func _save_settings() -> void:
+	var config := ConfigFile.new()
+	config.set_value("run", "best_score", best_score)
+	config.set_value("options", "muted", muted)
+	config.set_value("options", "reduced_motion", reduced_motion)
+	config.save(_settings_path())
+
 func _physics_process(delta: float) -> void:
 	if model.state == "running":
 		model.step(delta)
 		_sync_world(delta)
+	# Feedback events are level-side: compare previous presentation state.
+	if model.counter_count > previous_counters:
+		previous_counters = model.counter_count
+		play_sound("counter")
+	if model.hp < previous_hp:
+		previous_hp = model.hp
+		hit_flash_time = 0.22
+		play_sound("hit")
+	if model.hp > previous_hp:
+		previous_hp = model.hp
+	if hit_flash_time > 0.0 and not reduced_motion:
+		hit_flash_time = maxf(0.0, hit_flash_time - delta)
+		hit_flash.visible = hit_flash_time > 0.0
+		hit_flash.modulate.a = minf(1.0, hit_flash_time / 0.22)
+	else:
+		hit_flash.visible = false
 	_sync_ui()
 	if OS.has_feature("web"):
 		_web_status_elapsed += delta
@@ -276,7 +374,10 @@ func _sync_ui() -> void:
 	life_label.text = "● ".repeat(maxi(0, model.hp))
 	score_label.text = "%04d" % model.score
 	distance_label.text = "%d m  /  %d hits" % [int(model.distance), model.combo]
-	result_label.text = "%d points   ·   %d metres\n%d counters   ·   %d chains\nDodge first. Counter the open ring." % [model.score, int(model.distance), model.counter_count, model.chain_count]
+	if model.state == "dead" and model.score > best_score:
+		best_score = model.score
+		_save_settings()
+	result_label.text = "%d points   ·   %d metres\n%d counters   ·   %d chains\nBest: %d\nDodge first. Counter the open ring." % [model.score, int(model.distance), model.counter_count, model.chain_count, best_score]
 	var text: String = "Move out of the shield's lane when it winds up."
 	var ready_to_counter: bool = false
 	for e in model.enemies:
@@ -290,6 +391,12 @@ func _sync_ui() -> void:
 		break
 	if model.feedback != "":
 		text = model.feedback
+		if text.begins_with("Chain") and last_sound_feedback != text + str(model.chain_count):
+			last_sound_feedback = text + str(model.chain_count)
+			play_sound("chain")
+		elif text == "Clean!" and last_sound_feedback != "clean" + str(model.score):
+			last_sound_feedback = "clean" + str(model.score)
+			play_sound("clean")
 	instruction.text = text
 	attack_button.text = "Counter NOW" if ready_to_counter else "Counter"
 	attack_button.disabled = model.state != "running"
@@ -333,13 +440,20 @@ func _sync_world(delta: float) -> void:
 		actor.rotation = Vector3.ZERO
 		actor.scale = Vector3.ONE
 		if enemy.phase == "launched":
-			actor.rotation.x = PI * 0.5
+			actor.rotation.x += model.time * 9.0  # tumbling spin while flying
 			actor.position.y = 0.35
 		elif enemy.phase == "cleared":
-			actor.rotation.z = PI * 0.48
-			actor.scale = Vector3(0.45, 0.45, 0.45)
+			if enemy.kind == "hurdle":
+				actor.scale = Vector3(0.6, 0.6, 0.6)
+			else:
+				actor.rotation.z = PI * 0.48
+				actor.scale = Vector3(0.45, 0.45, 0.45)
 		elif enemy.phase == "bash":
-			actor.rotation.x = -0.20
+			# Forward lunge wind-up: rocks toward the player as it attacks.
+			actor.rotation.x = -0.20 - 0.16 * sin(model.time * 18.0)
+		elif enemy.phase == "recovery":
+			# Exposed lean-back invites the counter.
+			actor.rotation.x = 0.26
 		if enemy.kind == "shield" and enemy.z <= 12 and enemy.z > 6:
 			warning_lane.visible = true
 			warning_lane.position = Vector3(enemy.lane * 2.5, -0.04, -3.0)

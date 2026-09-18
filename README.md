@@ -57,7 +57,7 @@ godot --headless --path . --export-release Web
 
 ![Actual Godot gameplay](docs/screenshots/gameplay.png)
 
-The first shield is always in the middle lane. Leave that lane as it winds up, then press Space or Counter during the open-ring recovery. Counter score is 50; the two dummies award 100 each; the barricade awards 150. Jump and slide animate but are not yet tied to authored parkour obstacles. Runs intentionally reuse the same seed for reproducible playtesting.
+The first shield is always in the middle lane. Leave that lane as it winds up, then press Space or Counter during the open-ring recovery. Scoring: counter 50, each dummy 100, barricade 150, clean hurdle pass 25. Speed ramps gently with distance and caps at 14 m/s so late runs stay readable. Settings (sound, reduced motion) and best score persist between sessions; jump/slide now gate the low hurdle bars that follow each wave. Runs still reuse the same seed for reproducible playtesting.
 
 ## Layout
 

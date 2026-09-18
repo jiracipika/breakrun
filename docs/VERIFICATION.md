@@ -40,6 +40,14 @@ Generated concept files are preserved as design references. Actual title/gamepla
 - Player feet and outer-lane silhouette clear the controls and screen edge.
 - Keyboard, swipe, mouse button, pause and restart paths reach the actual scene.
 
+## Quality slice (speed ramp + hurdles + juice)
+
+- `test_core_updates.gd` (14 assertions): speed ramp growth/cap, chain reachable across the ramp, hurdle placement after the barrier, clean-pass 25 once-only, wrong-lane pass awards nothing, non-evaded hurdle contact still damages.
+- Launched shields no longer sweep hurdles (hurdles clear only via player evasion) — regression caught by test when the hurdle was added to waves.
+- Procedural startup-synthesized SFX (counter/hit/chain/clean), coral hit flash suppressed by reduced motion, bash lunge / recovery lean-back animation, launched-shield tumble.
+- `user://breakrun.cfg` persists best score, sound and reduced-motion toggles; pause overlay has Sound and Reduced motion switches.
+- Full suite plus `--render` capture pass; Web export re-verified headless. No human playtest or phone claim.
+
 ## Review and publication status
 
 Independent spec-review attempt via delegate_task was blocked by GLM HTTP 429 (billing/credits exhausted). It did not review code. A read-only fallback through the installed Codex CLI failed with HTTP 401 because its refresh token had already been used; no authentication configuration was changed. Neither attempt supplies an independent approval.

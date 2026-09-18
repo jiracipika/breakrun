@@ -98,11 +98,16 @@ static func courier(parent: Node3D) -> Node3D:
 static func enemy(parent: Node3D, kind: String) -> Node3D:
 	var actor := Node3D.new()
 	parent.add_child(actor)
-	if kind == "barrier" or kind == "hurdle":
+	if kind == "barrier":
 		box(actor, Vector3(1.9, 0.85, 0.3), Vector3(0, 0.6, 0), COBALT)
 		for i in range(4):
 			var stripe := box(actor, Vector3(0.18, 0.85, 0.34), Vector3(-0.65 + i * 0.43, 0.6, 0), SAFFRON)
 			stripe.rotation.z = -0.35
+	elif kind == "hurdle":
+		# Low thin bar: reads as jump/slide, distinct from the tall barricade.
+		box(actor, Vector3(2.0, 0.14, 0.16), Vector3(0, 0.45, 0), SAFFRON)
+		for side in [-1, 1]:
+			box(actor, Vector3(0.12, 0.5, 0.16), Vector3(side * 0.95, 0.22, 0), COBALT)
 	else:
 		box(actor, Vector3(0.7, 0.85, 0.48), Vector3(0, 1.05, 0), TEAL)
 		box(actor, Vector3(0.62, 0.43, 0.45), Vector3(0, 1.76, 0), COBALT)

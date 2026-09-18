@@ -6,3 +6,5 @@ artifacts/
 *.import
 export_credentials.cfg
 .vercel/
+.vercel
+.env*

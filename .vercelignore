@@ -1,4 +1,4 @@
-*
+!vercel.json
+!build_web.js
 !web/
 !web/**
-!vercel.json

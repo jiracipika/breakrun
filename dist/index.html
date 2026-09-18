@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0f">
+<meta name="description" content="BREAKRUN: dodge, counter, and launch your enemies through a rooftop checkpoint. Play the early Sunbreak Riot prototype.">
+<title>BREAKRUN — Sunbreak Riot</title>
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 100%; height: 100%; background: #0a0a0f; color: #fff4db; font-family: system-ui, sans-serif; overflow: hidden; }
+body { display: grid; place-items: center; }
+#frame { position: relative; height: 100vh; height: 100dvh; width: min(100vw, 56.25vh); width: min(100vw, 56.25dvh); }
+#canvas { display: block; width: 100%; height: 100%; border: 0; outline: none; touch-action: none; }
+#loading { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 32px; background: #0a0a0f; }
+h1 { font-size: clamp(32px, 8vw, 54px); margin: 0 0 8px; color: #ffca45; letter-spacing: -2px; }
+p { line-height: 1.5; }
+progress { width: 100%; accent-color: #ffca45; margin-top: 20px; }
+#notice { color: #ffca45; white-space: pre-wrap; }
+#help { position: fixed; left: 20px; bottom: 20px; max-width: 190px; color: #b8b6c5; font-size: 13px; line-height: 1.6; }
+@media (max-width: 950px) { #help { display: none; } }
+</style>
+<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
+<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+
+</head>
+<body>
+<main id="frame" aria-label="BREAKRUN game">
+<canvas id="canvas" tabindex="0" aria-label="BREAKRUN. Enter to start. A and D to change lanes, W to jump, S to slide, Space to counter, Escape to pause."></canvas>
+<section id="loading" aria-live="polite">
+<h1>BREAKRUN</h1><p>Sunbreak Riot<br>Every enemy is a weapon.</p>
+<progress id="progress" aria-label="Downloading game"></progress>
+<p id="notice">Loading the browser engine. First load may take a moment.</p>
+<noscript>JavaScript and WebGL 2 are required to play.</noscript>
+</section>
+</main>
+<aside id="help">Early playable prototype<br>A / D — change lane<br>W / S — jump / slide<br>Space — counter<br>Escape — pause<br><br>Touch: swipe the track.<br>Use the yellow Counter button.</aside>
+<script src="index.js"></script>
+<script>
+const config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":123544,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const canvas = document.getElementById('canvas');
+const notice = document.getElementById('notice');
+function resizeCanvas() {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+const engine = new Engine(config);
+const missing = Engine.getMissingFeatures({threads: false});
+window.breakrunLoadError = null;
+function failure(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  window.breakrunLoadError = message;
+  notice.textContent = 'Unable to start: ' + message + '\nTry a current browser with WebGL 2 enabled.';
+  document.getElementById('progress').hidden = true;
+  console.error(error);
+}
+if (missing.length) {
+  failure('Missing browser features: ' + missing.join(', '));
+} else {
+  engine.startGame({canvas, canvasResizePolicy: 0, onProgress(current, total) {
+    const bar = document.getElementById('progress');
+    if (total > 0) { bar.max = total; bar.value = current; }
+  }}).then(() => {
+    document.getElementById('loading').remove();
+    window.breakrunLoaded = true;
+    canvas.focus();
+  }).catch(failure);
+}
+</script>
+</body>
+</html>
+

@@ -48,6 +48,15 @@ Generated concept files are preserved as design references. Actual title/gamepla
 - `user://breakrun.cfg` persists best score, sound and reduced-motion toggles; pause overlay has Sound and Reduced motion switches.
 - Full suite plus `--render` capture pass; Web export re-verified headless and redeployed: the production `index.pck` SHA-256 matches the local build byte-for-byte, and a live Chromium session confirmed the updated build is served. No human playtest or phone claim.
 
+## Readability pass (vision-QC driven)
+
+A visual QC of fresh GL captures flagged three issues; all fixed and re-captured:
+1. The fixed decorative gantry at z=-65 read as a distant finish gate — removed entirely (chunk arches are future work, tracked in NEXT.md).
+2. Wave obstacles stacked into one merged clump — wave spacing widened from 4 m to 6 m per member, dummies given a slight lateral offset and idle sway, and the chain-time test updated to poll for contact instead of a fixed duration.
+3. Hurdle bars were nearly invisible at distance — taller saffron bar with a paper stripe, cobalt posts, and a ground shadow stripe.
+
+Post-fix capture QC: no gate remains, obstacles read as separate depth-separated items, no HUD regressions. Remaining noted items: player still sits close to the bottom control bar on short screens (framing test guards the 540x960 baseline only), and the shield robot could use a stronger color identity versus the barricade.
+
 ## Review and publication status
 
 Independent spec-review attempt via delegate_task was blocked by GLM HTTP 429 (billing/credits exhausted). It did not review code. A read-only fallback through the installed Codex CLI failed with HTTP 401 because its refresh token had already been used; no authentication configuration was changed. Neither attempt supplies an independent approval.

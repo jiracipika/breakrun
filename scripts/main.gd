@@ -442,6 +442,9 @@ func _sync_world(delta: float) -> void:
 		if enemy.phase == "launched":
 			actor.rotation.x += model.time * 9.0  # tumbling spin while flying
 			actor.position.y = 0.35
+		elif enemy.phase == "approach" and enemy.kind == "dummy":
+			# Idle sway so stacked dummies don't merge into one clump.
+			actor.rotation.z = 0.05 * sin(model.time * 3.0 + float(enemy.id))
 		elif enemy.phase == "cleared":
 			if enemy.kind == "hurdle":
 				actor.scale = Vector3(0.6, 0.6, 0.6)

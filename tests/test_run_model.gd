@@ -364,7 +364,10 @@ func _test_chain_scores_dummies_and_barrier_once() -> void:
 	shield.dodged = true
 	m.act("attack")
 	_assert_eq(m.score > score_before, true, "score increased after chain")
-	m.step(1.0) # Chain credit occurs on projectile contact, not the attack button.
+	for i in range(120): # Projectile contact is time-of-flight now, not the attack button.
+		m.step(1.0 / 60.0)
+		if m.chain_count > 0:
+			break
 	_assert_eq(m.chain_count, 1, "chain_count incremented after contact")
 	_end_test()
 

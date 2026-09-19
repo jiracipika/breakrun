@@ -59,14 +59,8 @@ static func build(parent: Node3D) -> Node3D:
 		if i % 3 == 0:
 			box(block, Vector3(2.4, 0.15, 3.3), Vector3(-side * 2.5, h - 1.5, 0), SAFFRON)
 			box(block, Vector3(1.2, 1.1, 1.2), Vector3(0.4, h + 0.6, -1), TEAL)
-	var arch := Node3D.new()
-	arch.position.z = -65
-	world.add_child(arch)
-	for side in [-1, 1]:
-		box(arch, Vector3(0.35, 6.0, 0.35), Vector3(side * 4.0, 3, 0), TEAL)
-	box(arch, Vector3(8.2, 0.7, 0.35), Vector3(0, 5.6, 0), COBALT)
-	for i in range(7):
-		box(arch, Vector3(0.7, 0.45, 0.38), Vector3(-3 + i, 5.6, 0), SAFFRON)
+	# The old fixed decorative gantry was removed: it read as a distant finish gate
+	# and confused obstacle readability. Reusable chunk arches replace it later.
 	return world
 
 static func limb(parent: Node3D, id: String, pivot: Vector3, size: Vector3, color: Color) -> Node3D:
@@ -104,14 +98,17 @@ static func enemy(parent: Node3D, kind: String) -> Node3D:
 			var stripe := box(actor, Vector3(0.18, 0.85, 0.34), Vector3(-0.65 + i * 0.43, 0.6, 0), SAFFRON)
 			stripe.rotation.z = -0.35
 	elif kind == "hurdle":
-		# Low thin bar: reads as jump/slide, distinct from the tall barricade.
-		box(actor, Vector3(2.0, 0.14, 0.16), Vector3(0, 0.45, 0), SAFFRON)
+		# Low bar but taller and higher-contrast so it reads at distance.
+		box(actor, Vector3(2.1, 0.2, 0.18), Vector3(0, 0.62, 0), SAFFRON)
+		box(actor, Vector3(2.1, 0.06, 0.2), Vector3(0, 0.5, 0), PAPER)
 		for side in [-1, 1]:
-			box(actor, Vector3(0.12, 0.5, 0.16), Vector3(side * 0.95, 0.22, 0), COBALT)
+			box(actor, Vector3(0.14, 0.62, 0.18), Vector3(side * 1.0, 0.31, 0), COBALT)
+		box(actor, Vector3(2.3, 0.03, 0.5), Vector3(0, 0.015, 0), COBALT)
 	else:
-		box(actor, Vector3(0.7, 0.85, 0.48), Vector3(0, 1.05, 0), TEAL)
-		box(actor, Vector3(0.62, 0.43, 0.45), Vector3(0, 1.76, 0), COBALT)
-		box(actor, Vector3(0.43, 0.09, 0.05), Vector3(0, 1.78, 0.26), PAPER)
+		var sway: float = 0.22 if kind == "dummy" else 0.0
+		box(actor, Vector3(0.7, 0.85, 0.48), Vector3(sway, 1.05, 0), TEAL)
+		box(actor, Vector3(0.62, 0.43, 0.45), Vector3(sway, 1.76, 0), COBALT)
+		box(actor, Vector3(0.43, 0.09, 0.05), Vector3(sway, 1.78, 0.26), PAPER)
 		for side in [-1, 1]:
 			box(actor, Vector3(0.25, 0.6, 0.25), Vector3(side * 0.23, 0.35, 0), COBALT)
 			box(actor, Vector3(0.27, 0.60, 0.27), Vector3(side * 0.5, 1.1, 0), TEAL)

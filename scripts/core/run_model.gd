@@ -163,11 +163,12 @@ func _tick(dt: float) -> void:
 		_next_wave_distance += WAVE_SPACING
 
 func _spawn_wave(z: float, target_lane: int) -> void:
+	# Wider spacing gives each obstacle its own readable approach window.
 	var kinds: Array[String] = ["shield", "dummy", "dummy", "barrier", "hurdle"]
 	for i in range(kinds.size()):
 		enemies.append({"id": _next_id, "kind": kinds[i], "lane": target_lane,
-			"z": z + 4.0 * i, "phase": "approach", "dodged": false,
-			"age": 0.0, "hits": 0, "rewarded": false, "previous_z": z + 4.0 * i})
+			"z": z + 6.0 * i, "phase": "approach", "dodged": false,
+			"age": 0.0, "hits": 0, "rewarded": false, "previous_z": z + 6.0 * i})
 		_next_id += 1
 
 func _try_counter() -> void:

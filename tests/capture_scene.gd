@@ -36,7 +36,7 @@ func _process(_delta: float) -> bool:
 		capture("title")
 	if frames == 30:
 		game.get_node("Interface/Title/StartButton").pressed.emit()
-	if frames > 30 and frames < 316:
+	if frames > 30 and frames < 323:
 		game._physics_process(1.0 / 60.0)
 	if frames == 60:
 		# Legend is up before the first scripted input hides it at frame 80.
@@ -74,20 +74,28 @@ func _process(_delta: float) -> bool:
 			1 if (crashed != null and crashed.phase == "cleared") else 0,
 			1 if game.model.stagger_ratio() > 0.0 else 0])
 		capture("stagger")
-	if frames == 315:
+	if frames == 313:
+		# Stage a kicker during its telegraph; capture after the stagger flash
+		# has fully faded so the robot and stripe read cleanly.
+		game.model.enemies.append({"id": 998, "kind": "kicker", "lane": game.model.lane,
+			"z": 12.5, "phase": "approach", "dodged": false, "age": 0.0,
+			"hits": 0, "rewarded": false, "swept": false, "previous_z": 12.5})
+	if frames == 324:
+		capture("kicker")
+	if frames == 326:
 		key(KEY_ESCAPE)
-	if frames == 318:
+	if frames == 329:
 		capture("paused")
 		if game.model.state != "paused":
 			errors += 1
 		key(KEY_ESCAPE)
-	if frames == 320:
+	if frames == 331:
 		# End the run deterministically to capture the new result screen.
 		game.model.hp = 1
 		game.model.last_hit_kind = "shield"
 		game.model.state = "dead"
 		game._sync_ui()
-	if frames == 328:
+	if frames == 339:
 		capture("result")
 		quit(1 if errors else 0)
 	return false

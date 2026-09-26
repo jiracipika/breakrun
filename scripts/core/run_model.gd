@@ -11,6 +11,9 @@ const SHIELD_BASH_Z: float = 9.0
 const SHIELD_RECOVERY_Z: float = 6.0
 const COUNTER_MIN_Z: float = 2.0
 const COUNTER_MAX_Z: float = 6.0
+const KICKER_TELEGRAPH_Z: float = 16.0
+const KICKER_SWEEP_Z: float = 9.0
+const KICKER_RECOVERY_Z: float = 6.0
 const STAGGER_TIME: float = 1.0
 const STAGGER_SLOWDOWN: float = 0.8
 const INPUT_BUFFER: float = 0.25
@@ -19,6 +22,7 @@ const INPUT_BUFFER: float = 0.25
 const CHECKPOINT_WAVE: Array = [["shield", 0.0], ["dummy", 6.0], ["dummy", 12.0], ["barrier", 18.0], ["hurdle", 24.0]]
 const PATROL_WAVE: Array = [["shield", 0.0], ["dummy", 6.0], ["dummy", 12.0], ["dummy", 18.0]]
 const FENCE_WAVE: Array = [["shield", 0.0], ["barrier", 8.0], ["hurdle", 16.0]]
+const SWEEP_WAVE: Array = [["kicker", 0.0], ["dummy", 6.0], ["dummy", 12.0], ["hurdle", 18.0]]
 
 var state: String = "title"
 var lane: int = 0
@@ -149,6 +153,20 @@ func _buffer(action: String) -> void:
 	_buffered_action = action
 	_buffer_time = INPUT_BUFFER
 
+## Shared damage path: pip loss, style reset, stagger, readable cause.
+func _damage(kind: String) -> void:
+	if _invulnerability > 0.0:
+		return
+	hp -= 1
+	combo = 0
+	last_hit_kind = kind
+	_stagger = STAGGER_TIME
+	_invulnerability = 1.0
+	_message("Hit! Change lane before contact.", 1.5)
+	if hp <= 0:
+		state = "dead"
+		_message("Run ended. Try the recovery counter.", 999.0)
+
 ## Fire a buffered jump/slide the moment it becomes executable.
 func _try_buffered_action() -> void:
 	if _buffered_action == "jump" and _jump <= 0.0 and _slide <= 0.0:
@@ -187,6 +205,19 @@ func _tick(dt: float) -> void:
 				e.phase = "bash"
 				if e.lane != lane:
 					e.dodged = true
+		elif e.kind == "kicker" and e.phase != "cleared":
+			if e.z <= KICKER_RECOVERY_Z:
+				e.phase = "recovery"
+			elif e.z <= KICKER_SWEEP_Z:
+				e.phase = "sweep"
+				if not e["swept"]:
+					e["swept"] = true
+					if e.lane != lane or sliding:
+						# Sliding under the high sweep — or not being there — dodges it.
+						e.dodged = true
+					else:
+						# The sweep is high: jumping does not clear it.
+						_damage("kicker")
 	# Advance projectiles before testing ordinary contact. Each target scores once.
 	for projectile in enemies:
 		if projectile.phase != "launched":
@@ -216,17 +247,11 @@ func _tick(dt: float) -> void:
 						_message("Clean!", 0.8)
 					continue
 				# Same lane without evasion trips the runner into the damage path.
+			if e.kind == "kicker" and sliding:
+				continue  # a slide slips between the fork legs
 			if _invulnerability <= 0.0:
-				hp -= 1
-				combo = 0
-				last_hit_kind = e.kind
-				_stagger = STAGGER_TIME
+				_damage(e.kind)
 				e.phase = "cleared"
-				_invulnerability = 1.0
-				_message("Hit! Change lane before contact.", 1.5)
-				if hp <= 0:
-					state = "dead"
-					_message("Run ended. Try the recovery counter.", 999.0)
 	# No mutation of array structure during iteration.
 	enemies = enemies.filter(func(e: Dictionary) -> bool:
 		return e.z >= -5.0 and (e.phase != "launched" or e.age < 1.5))
@@ -242,12 +267,14 @@ func _spawn_wave(z: float) -> void:
 	if _waves_spawned >= 1:
 		target_lane = _rng.randi_range(-1, 1)
 	if _waves_spawned >= 2:
-		match _rng.randi_range(0, 2):
+		match _rng.randi_range(0, 3):
 			0:
 				archetype = PATROL_WAVE
 			1:
 				archetype = FENCE_WAVE
 			2:
+				archetype = SWEEP_WAVE
+			3:
 				pass
 	var neighbor: int = clampi(target_lane + (1 if target_lane <= 0 else -1), -1, 1)
 	for i in range(archetype.size()):
@@ -255,13 +282,15 @@ func _spawn_wave(z: float) -> void:
 		var lane: int = target_lane
 		if archetype == PATROL_WAVE and i == 2:
 			lane = neighbor
+		elif archetype == SWEEP_WAVE and i == 1:
+			lane = neighbor
 		elif archetype == FENCE_WAVE and i == 1:
 			lane = neighbor
 		elif archetype == FENCE_WAVE and i == 2:
 			lane = 0 if neighbor == 1 else -1
 		enemies.append({"id": _next_id, "kind": member[0], "lane": lane,
 			"z": z + member[1], "phase": "approach", "dodged": false,
-			"age": 0.0, "hits": 0, "rewarded": false, "previous_z": z + member[1]})
+			"age": 0.0, "hits": 0, "rewarded": false, "swept": false, "previous_z": z + member[1]})
 		_next_id += 1
 	_waves_spawned += 1
 
@@ -270,7 +299,8 @@ func _try_counter() -> void:
 	for e in enemies:
 		if e.phase == "launched" and feedback_time > 0.0:
 			return # Repeated taps must not overwrite earned success feedback.
-		if e.kind == "shield" and e.phase != "cleared" and e.phase != "launched":
+		var strikeable: bool = (e.kind == "shield" or e.kind == "kicker") and e.phase != "cleared" and e.phase != "launched"
+		if strikeable:
 			if nearest.is_empty() or e.z < nearest.z:
 				nearest = e
 	if nearest.is_empty():
@@ -280,15 +310,15 @@ func _try_counter() -> void:
 	elif nearest.z < COUNTER_MIN_Z:
 		_message("Too late. Counter while the ring is open.", 0.8)
 	elif not nearest.dodged:
-		_message("Dodge its bash first!", 0.8)
+		_message("Slide under its sweep first!" if nearest.kind == "kicker" else "Dodge its bash first!", 0.8)
 	elif absi(int(nearest.lane) - lane) > 1:
-		_message("Move beside the shield to counter.", 0.8)
+		_message("Move beside it to counter.", 0.8)
 	else:
 		nearest.phase = "launched"
 		counter_count += 1
 		last_counter_lane = nearest.lane
 		_reward(50)
-		_message("Counter!", 1.0)
+		_message("Swept!" if nearest.kind == "kicker" else "Counter!", 1.0)
 
 func _message(text: String, duration: float) -> void:
 	feedback = text

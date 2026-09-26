@@ -104,6 +104,21 @@ static func enemy(parent: Node3D, kind: String) -> Node3D:
 		for side in [-1, 1]:
 			box(actor, Vector3(0.14, 0.62, 0.18), Vector3(side * 1.0, 0.31, 0), COBALT)
 		box(actor, Vector3(2.3, 0.03, 0.5), Vector3(0, 0.015, 0), COBALT)
+	elif kind == "kicker":
+		# Tall forked stamping robot: saffron foot telegraphs, gold stripe
+		# marks the sweep lane from a readable distance.
+		box(actor, Vector3(0.62, 1.7, 0.4), Vector3(0, 1.35, 0), COBALT)
+		box(actor, Vector3(0.5, 0.3, 0.4), Vector3(0, 2.35, 0), TEAL)
+		for side in [-1, 1]:
+			box(actor, Vector3(0.16, 0.55, 0.16), Vector3(side * 0.22, 2.7, 0), COBALT)
+			box(actor, Vector3(0.26, 0.6, 0.26), Vector3(side * 0.5, 1.2, 0), TEAL)
+		limb(actor, "Foot", Vector3(0, 1.5, 0.24), Vector3(0.52, 0.6, 0.52), SAFFRON)
+		var stripe := Node3D.new()
+		stripe.name = "Stripe"
+		actor.add_child(stripe)
+		box(stripe, Vector3(2.0, 0.03, 3.4), Vector3(0, 0.02, 1.9), SAFFRON)
+		box(stripe, Vector3(0.16, 0.035, 3.4), Vector3(-0.92, 0.03, 1.9), PAPER)
+		box(stripe, Vector3(0.16, 0.035, 3.4), Vector3(0.92, 0.03, 1.9), PAPER)
 	else:
 		var sway: float = 0.22 if kind == "dummy" else 0.0
 		box(actor, Vector3(0.7, 0.85, 0.48), Vector3(sway, 1.05, 0), TEAL)

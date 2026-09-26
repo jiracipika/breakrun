@@ -416,6 +416,8 @@ func _failure_line() -> String:
 	match model.last_hit_kind:
 		"shield":
 			return "Shield bash caught you — counter it."
+		"kicker":
+			return "A stamp sweep caught you — slide under it."
 		"dummy":
 			return "A robot clipped you — counter clears."
 		"barrier":
@@ -466,13 +468,20 @@ func _sync_ui() -> void:
 	var text: String = "Move out of the shield's lane when it winds up."
 	var ready_to_counter: bool = false
 	for e in model.enemies:
-		if e.kind != "shield" or e.phase == "launched" or e.phase == "cleared":
+		if (e.kind != "shield" and e.kind != "kicker") or e.phase == "launched" or e.phase == "cleared":
 			continue
-		if e.z <= 12 and e.z > 6:
-			text = "DODGE  ←  Leave the marked lane  →"
-		if e.z <= 6 and e.z >= 2 and e.dodged:
-			text = "COUNTER NOW  ·  tap anywhere"
-			ready_to_counter = absi(int(e.lane) - model.lane) <= 1
+		if e.kind == "kicker":
+			if e.z <= 16 and e.z > 9:
+				text = "SWEEP!  Slide the striped lane"
+			if e.z <= 6 and e.z >= 2 and e.dodged:
+				text = "STRIKE NOW  ·  tap anywhere"
+				ready_to_counter = absi(int(e.lane) - model.lane) <= 1
+		else:
+			if e.z <= 12 and e.z > 6:
+				text = "DODGE  —  leave the marked lane"
+			if e.z <= 6 and e.z >= 2 and e.dodged:
+				text = "COUNTER NOW  ·  tap anywhere"
+				ready_to_counter = absi(int(e.lane) - model.lane) <= 1
 		break
 	if model.feedback != "":
 		text = model.feedback
@@ -549,6 +558,11 @@ func _sync_world(delta: float) -> void:
 			else:
 				actor.rotation.z = PI * 0.48
 				actor.scale = Vector3(0.45, 0.45, 0.45)
+		elif enemy.phase == "sweep":
+			# High stamp: the saffron foot swings through the lane.
+			var kicker_foot: Node3D = actor.get_node_or_null("Foot")
+			if kicker_foot != null:
+				kicker_foot.rotation.x = -1.9 - 0.5 * sin(model.time * 20.0)
 		elif enemy.phase == "bash":
 			# Forward lunge wind-up: rocks toward the player as it attacks.
 			actor.rotation.x = -0.20 - 0.16 * sin(model.time * 18.0)
@@ -561,7 +575,11 @@ func _sync_world(delta: float) -> void:
 		if enemy.kind == "shield" and enemy.phase == "approach" and enemy.z <= 12 and enemy.z > 6:
 			warning_lane.visible = true
 			warning_lane.position = Vector3(enemy.lane * 2.5, -0.04, -3.0)
-		if enemy.kind == "shield" and enemy.phase == "recovery" and enemy.z >= 2:
+		if enemy.kind == "kicker":
+			var stripe: Node3D = actor.get_node_or_null("Stripe")
+			if stripe != null:
+				stripe.visible = (enemy.phase == "approach" or enemy.phase == "sweep") and enemy.z <= 16.0
+		if (enemy.kind == "shield" or enemy.kind == "kicker") and enemy.phase == "recovery" and enemy.z >= 2:
 			counter_ring.visible = true
 			counter_ring.position = Vector3(enemy.lane * 2.5, 0.06, -enemy.z)
 	for id in enemy_nodes.keys():

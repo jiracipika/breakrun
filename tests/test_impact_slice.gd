@@ -119,15 +119,16 @@ func _init() -> void:
 		"first wave is the teaching checkpoint")
 	check(groups[1].size() == 5 and groups[1][0].kind == "shield", "second wave keeps the teaching shape")
 	var valid_sizes := {5: true, 4: true, 3: true}
+	var strikeable := ["shield", "kicker"]
 	for gi in range(groups.size()):
 		var g: Array = groups[gi]
 		check(valid_sizes.has(g.size()), "wave %d matches a known archetype size" % gi)
-		check(g[0].kind == "shield", "wave %d opens with the shield" % gi)
-		var shields: int = 0
+		check(g[0].kind in strikeable, "wave %d opens with a strike-able robot" % gi)
+		var strikeables: int = 0
 		for member in g:
-			if member.kind == "shield":
-				shields += 1
-		check(shields == 1, "wave %d has exactly one shield" % gi)
+			if member.kind in strikeable:
+				strikeables += 1
+		check(strikeables == 1, "wave %d has exactly one strike-able robot" % gi)
 		for mi in range(1, g.size()):
 			check(g[mi].z - g[mi - 1].z >= 5.9, "wave %d keeps readable spacing" % gi)
 	# Variety appears, and seeds stay replayable.

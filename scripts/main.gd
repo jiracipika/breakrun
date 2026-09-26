@@ -271,10 +271,16 @@ func _input(event: InputEvent) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		var code: int = event.physical_keycode if event.physical_keycode != 0 else event.keycode
-		if code == KEY_ESCAPE:
+		if code == KEY_ESCAPE and model.state != "dead":
 			pause_run()
 			get_viewport().set_input_as_handled()
-		elif code == KEY_ENTER and model.state == "title":
+		elif model.state == "title" and (code == KEY_ENTER or code == KEY_SPACE):
+			start_run()
+			get_viewport().set_input_as_handled()
+		elif model.state == "dead" and code == KEY_ESCAPE:
+			return_to_title()
+			get_viewport().set_input_as_handled()
+		elif model.state == "dead" and (code == KEY_ENTER or code == KEY_SPACE or code == KEY_R):
 			start_run()
 			get_viewport().set_input_as_handled()
 		elif model.state == "running":
@@ -429,7 +435,11 @@ func _sync_world(delta: float) -> void:
 	runner.position.x = lerpf(runner.position.x, model.lane * 2.5, blend)
 	runner.position.y = model.height
 	runner.scale.y = 0.55 if model.sliding else 1.0
-	var stride: float = sin(model.time * 16.0) * 0.60 if model.state == "running" else 0.0
+	# Stumble feedback: lean back, drop stride, nudge toward the camera.
+	var stagger: float = model.stagger_ratio() if model.state == "running" else 0.0
+	runner.rotation.x = -0.5 * stagger
+	runner.position.z = 0.6 * stagger
+	var stride: float = sin(model.time * 16.0) * 0.60 * (1.0 - 0.7 * stagger) if model.state == "running" else 0.0
 	runner.get_node("LegL").rotation.x = stride
 	runner.get_node("LegR").rotation.x = -stride
 	runner.get_node("ArmL").rotation.x = -stride

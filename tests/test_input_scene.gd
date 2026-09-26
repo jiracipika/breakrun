@@ -102,6 +102,17 @@ func run() -> void:
 	game.return_to_title()
 	start_button.pressed.emit()
 	check(game.model.state == "running", "actual Start button signal is connected")
+	game.model.hp = 1
+	game.model.last_hit_kind = "shield"
+	game.model.state = "dead"
+	game._sync_ui()
+	check(game.result_overlay.visible, "death shows the result overlay")
+	key(KEY_ENTER)
+	check(game.model.state == "running", "Enter restarts from the result screen")
+	game.model.state = "dead"
+	game._sync_ui()
+	key(KEY_ESCAPE)
+	check(game.model.state == "title", "Escape returns to title from the result screen")
 	print("INPUT: %d/%d checks passed" % [checks - failures, checks])
 	game.free()
 	quit(1 if failures else 0)

@@ -40,6 +40,7 @@ def run(label, arguments, timeout=60):
             passed = False
     if label == "capture":
         passed = passed and "LIVE: counters=1 chains=1 score=587 hp=3" in output
+        passed = passed and "LIVE-STAGGER: hp=2 cleared=1 staggered=1" in output
     print(f"{'PASS' if passed else 'FAIL'} {label}: {checks} assertions; {time.monotonic()-started:.2f}s")
     if not passed:
         print(output)

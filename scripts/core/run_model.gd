@@ -11,6 +11,14 @@ const SHIELD_BASH_Z: float = 9.0
 const SHIELD_RECOVERY_Z: float = 6.0
 const COUNTER_MIN_Z: float = 2.0
 const COUNTER_MAX_Z: float = 6.0
+const STAGGER_TIME: float = 1.0
+const STAGGER_SLOWDOWN: float = 0.8
+const INPUT_BUFFER: float = 0.25
+# Wave archetypes: [kind, z offset]. Checkpoint is the teaching chain wave;
+# patrol and fence vary lanes while keeping one shield and readable spacing.
+const CHECKPOINT_WAVE: Array = [["shield", 0.0], ["dummy", 6.0], ["dummy", 12.0], ["barrier", 18.0], ["hurdle", 24.0]]
+const PATROL_WAVE: Array = [["shield", 0.0], ["dummy", 6.0], ["dummy", 12.0], ["dummy", 18.0]]
+const FENCE_WAVE: Array = [["shield", 0.0], ["barrier", 8.0], ["hurdle", 16.0]]
 
 var state: String = "title"
 var lane: int = 0
@@ -30,6 +38,10 @@ var last_counter_lane: int = 0
 var run_seed: int = 42
 var last_hit_kind: String = ""
 var best_combo: int = 0
+var _stagger: float = 0.0
+var _buffered_action: String = ""
+var _buffer_time: float = 0.0
+var _waves_spawned: int = 0
 var _rng := RandomNumberGenerator.new()
 var _next_id: int = 0
 var _next_wave_distance: float = WAVE_SPACING
@@ -57,12 +69,16 @@ func start(seed_value: int = 42) -> void:
 	last_counter_lane = 0
 	last_hit_kind = ""
 	best_combo = 0
+	_stagger = 0.0
+	_buffered_action = ""
+	_buffer_time = 0.0
+	_waves_spawned = 0
 	_next_id = 0
 	_next_wave_distance = WAVE_SPACING
 	_invulnerability = 0.0
 	_jump = 0.0
 	_slide = 0.0
-	_spawn_wave(SPAWN_DISTANCE, 0)
+	_spawn_wave(SPAWN_DISTANCE)
 
 func act(action: String) -> void:
 	if state != "running":
@@ -73,10 +89,14 @@ func act(action: String) -> void:
 		"jump":
 			if _jump <= 0.0 and _slide <= 0.0:
 				_jump = 0.5
+			else:
+				_buffer("jump")
 		"slide":
 			if _slide <= 0.0 and _jump <= 0.0:
 				_slide = 0.5
 				sliding = true
+			else:
+				_buffer("slide")
 		"attack": _try_counter()
 
 func toggle_pause() -> void:
@@ -99,6 +119,17 @@ func step(delta: float) -> void:
 func speed() -> float:
 	return minf(PLAYER_SPEED + distance * 0.02, MAX_SPEED)
 
+## World speed with the hit-stagger slowdown applied. Player, enemies and
+## projectiles all move at this, so a stumble reads as the whole run lurching.
+func world_speed() -> float:
+	if _stagger <= 0.0:
+		return speed()
+	return speed() * (1.0 - STAGGER_SLOWDOWN * (_stagger / STAGGER_TIME))
+
+## 1.0 right after a hit, easing to 0.0 as the stagger recovers.
+func stagger_ratio() -> float:
+	return clampf(_stagger / STAGGER_TIME, 0.0, 1.0)
+
 ## Style multiplier: 1.0 at combo 0, +0.25 per uninterrupted success, capped at 3.0.
 func style_multiplier() -> float:
 	return 1.0 + 0.25 * mini(combo, 8)
@@ -114,13 +145,31 @@ func _reward(base: int) -> void:
 	combo += 1
 	best_combo = maxi(best_combo, combo)
 
+func _buffer(action: String) -> void:
+	_buffered_action = action
+	_buffer_time = INPUT_BUFFER
+
+## Fire a buffered jump/slide the moment it becomes executable.
+func _try_buffered_action() -> void:
+	if _buffered_action == "jump" and _jump <= 0.0 and _slide <= 0.0:
+		_buffered_action = ""
+		act("jump")
+	elif _buffered_action == "slide" and _slide <= 0.0 and _jump <= 0.0:
+		_buffered_action = ""
+		act("slide")
+
 func _tick(dt: float) -> void:
 	time += dt
-	var current_speed: float = speed()
+	var current_speed: float = world_speed()
 	distance += current_speed * dt
 	_jump = maxf(0.0, _jump - dt)
 	_slide = maxf(0.0, _slide - dt)
 	_invulnerability = maxf(0.0, _invulnerability - dt)
+	_stagger = maxf(0.0, _stagger - dt)
+	_buffer_time = maxf(0.0, _buffer_time - dt)
+	if _buffer_time == 0.0:
+		_buffered_action = ""
+	_try_buffered_action()
 	height = 1.5 * sin((1.0 - _jump / 0.5) * PI) if _jump > 0.000001 else 0.0
 	sliding = _slide > 0.000001
 	feedback_time = maxf(0.0, feedback_time - dt)
@@ -171,6 +220,8 @@ func _tick(dt: float) -> void:
 				hp -= 1
 				combo = 0
 				last_hit_kind = e.kind
+				_stagger = STAGGER_TIME
+				e.phase = "cleared"
 				_invulnerability = 1.0
 				_message("Hit! Change lane before contact.", 1.5)
 				if hp <= 0:
@@ -180,17 +231,39 @@ func _tick(dt: float) -> void:
 	enemies = enemies.filter(func(e: Dictionary) -> bool:
 		return e.z >= -5.0 and (e.phase != "launched" or e.age < 1.5))
 	if distance >= _next_wave_distance and state == "running":
-		_spawn_wave(SPAWN_DISTANCE - (distance - _next_wave_distance), _rng.randi_range(-1, 1))
+		_spawn_wave(SPAWN_DISTANCE - (distance - _next_wave_distance))
 		_next_wave_distance += WAVE_SPACING
 
-func _spawn_wave(z: float, target_lane: int) -> void:
-	# Wider spacing gives each obstacle its own readable approach window.
-	var kinds: Array[String] = ["shield", "dummy", "dummy", "barrier", "hurdle"]
-	for i in range(kinds.size()):
-		enemies.append({"id": _next_id, "kind": kinds[i], "lane": target_lane,
-			"z": z + 6.0 * i, "phase": "approach", "dodged": false,
-			"age": 0.0, "hits": 0, "rewarded": false, "previous_z": z + 6.0 * i})
+func _spawn_wave(z: float) -> void:
+	# The first two waves teach the checkpoint chain; later waves draw an
+	# archetype from the seed so runs vary while staying readable and fair.
+	var archetype: Array = CHECKPOINT_WAVE
+	var target_lane: int = 0
+	if _waves_spawned >= 1:
+		target_lane = _rng.randi_range(-1, 1)
+	if _waves_spawned >= 2:
+		match _rng.randi_range(0, 2):
+			0:
+				archetype = PATROL_WAVE
+			1:
+				archetype = FENCE_WAVE
+			2:
+				pass
+	var neighbor: int = clampi(target_lane + (1 if target_lane <= 0 else -1), -1, 1)
+	for i in range(archetype.size()):
+		var member: Array = archetype[i]
+		var lane: int = target_lane
+		if archetype == PATROL_WAVE and i == 2:
+			lane = neighbor
+		elif archetype == FENCE_WAVE and i == 1:
+			lane = neighbor
+		elif archetype == FENCE_WAVE and i == 2:
+			lane = 0 if neighbor == 1 else -1
+		enemies.append({"id": _next_id, "kind": member[0], "lane": lane,
+			"z": z + member[1], "phase": "approach", "dodged": false,
+			"age": 0.0, "hits": 0, "rewarded": false, "previous_z": z + member[1]})
 		_next_id += 1
+	_waves_spawned += 1
 
 func _try_counter() -> void:
 	var nearest: Dictionary = {}

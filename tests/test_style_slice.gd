@@ -20,13 +20,15 @@ func until_damaged(model: RefCounted, max_steps: int = 20000) -> void:
 		steps += 1
 		model.step(1.0 / 120.0)
 
-## Lane of each spawned wave's shield, read from deterministic enemy ids.
+## Lane of each spawned wave's shield, recorded per spawn batch (archetype
+## waves hold 3-5 members, so shield ids are no longer fixed strides).
 ## The probe runner takes hits, so it runs with padded integrity to stay alive.
 func wave_lanes(Model, seed_value: int, waves: int) -> Array:
 	var m = Model.new()
 	m.start(seed_value)
 	m.hp = 999
 	var lanes: Array = []
+	var known := {}
 	var steps: int = 0
 	while lanes.size() < waves and steps < 400000:
 		steps += 1
@@ -35,8 +37,10 @@ func wave_lanes(Model, seed_value: int, waves: int) -> Array:
 		if m.distance == before:
 			break
 		for e in m.enemies:
-			if e.kind == "shield" and e.id == lanes.size() * 5:
-				lanes.append(int(e.lane))
+			if not known.has(e.id):
+				known[e.id] = true
+				if e.kind == "shield":
+					lanes.append(int(e.lane))
 	return lanes
 
 func _init() -> void:

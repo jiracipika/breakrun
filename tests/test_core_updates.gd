@@ -57,9 +57,14 @@ func _init() -> void:
 	if barrier != null and hurdle != null:
 		check(hurdle.z > barrier.z, "hurdle arrives after the barrier")
 	check(h.score == 0, "no score before play")
-	# Clean pass: stay in lane, jump the hurdle line.
+	# Clean pass: stay in lane, jump the hurdle line. Earlier wave members are
+	# cleared harness-side: face-tanking a whole wave is now lethal by design,
+	# and this test isolates the hurdle contract.
 	var j = Model.new()
 	j.start(42)
+	for e in j.enemies:
+		if e.kind != "hurdle":
+			e.phase = "cleared"
 	advance(j, 4.9)
 	var hj = null
 	for e in j.enemies:
@@ -81,8 +86,11 @@ func _init() -> void:
 	# Different-lane pass scores nothing.
 	var s = Model.new()
 	s.start(42)
-	advance(s, 4.9)
+	for e in s.enemies:
+		if e.kind != "hurdle":
+			e.phase = "cleared"
 	s.act("right")
+	advance(s, 4.9)
 	var hs = null
 	for e in s.enemies:
 		if e.kind == "hurdle": hs = e

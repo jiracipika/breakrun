@@ -68,6 +68,15 @@ Post-fix capture QC: no gate remains, obstacles read as separate depth-separated
 - Post-deploy live check (production `https://breakrun-jiracipikas-projects.vercel.app/`): response carries `cross-origin-opener-policy: same-origin` and `cross-origin-embedder-policy: require-corp`; served `index.icon.png` and `index.pck` SHA-256 hashes match the local build byte-for-byte; a real browser session booted the engine under the new isolation headers, clicked Start on the title screen and reached running gameplay ("3 m / 0 hits" HUD, first wave visible). Desktop-browser proof only; not a phone or full-chain live re-run.
 - Not proven: human playtest of the multiplier feel, phone behavior, cross-browser GPU matrix, style variety enforcement (combo counts any successes, not distinct action types — simplification recorded in the plan).
 
+## Impact and rhythm slice (contact stagger, input buffer, wave archetypes)
+
+- `test_impact_slice.gd` (69 assertions): contact staggers immediately and slows the world below the base ramp, stagger recovers fully after 1 s, the struck enemy is knocked down (`cleared`) and awards nothing, a staggered twin run loses ground; buffered jump fires at slide end within the 0.25 s window, expired buffers vanish, latest input wins, edge lane presses are not buffered; first two waves keep the teaching shape, every wave opens with exactly one shield, member spacing ≥ 6 m, archetype sizes vary across seeds, and the same seed reproduces the same wave sequence.
+- Design consequence caught by a test timeout (infinite loop on a dead model): with stagger, invulnerability windows no longer chain across a face-tanked wave, so running straight through a wave is now lethal — the hurdle tests were changed to isolate the hurdle contract instead of face-tanking, and the regression soak now dodges into a free lane with padded integrity (its intent is bounds/traversal, not survival skill).
+- Presentation verified in the GL capture: staged contact shows the coral flash, two pips, the stumble lean with the knocked-down dummy beside the runner (`LIVE-STAGGER: hp=2 cleared=1 staggered=1` enforced by `tools/verify.py`).
+- `test_input_scene.gd` (19 assertions): Enter restarts from the result screen, Escape returns to title.
+- Full `verify.py --render` pass: 11/11 suites, 235 assertions. Chain reference 587 unchanged (teaching wave untouched by archetype variety).
+- Not proven: human feel of stagger tuning (duration/slowdown are first-pass values), phone behavior, cross-browser matrix.
+
 ## Review and publication status
 
 Independent spec-review attempt via delegate_task was blocked by GLM HTTP 429 (billing/credits exhausted). It did not review code. A read-only fallback through the installed Codex CLI failed with HTTP 401 because its refresh token had already been used; no authentication configuration was changed. Neither attempt supplies an independent approval.

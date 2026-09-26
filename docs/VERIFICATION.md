@@ -65,6 +65,7 @@ Post-fix capture QC: no gate remains, obstacles read as separate depth-separated
 - Presentation verified in fresh GL captures: HUD style readout fits its panel, result screen shows points/metres/(new!), counters/chains/best style, best score, seed, and a cause-specific failure line (custom result capture step added).
 - Full `verify.py --render` pass: 10/10 suites, 162 assertions. Web export rebuilt; exported `index.html` carries the original programmatic icon, favicon links and social meta. The `breakrunState` hook is compiled only into debug builds; release exports no longer ship it.
 - vercel.json now sends COOP/COEP headers to match the export's `ensureCrossOriginIsolationHeaders`; live-header check recorded below after deploy.
+- Post-deploy live check (production `https://breakrun-jiracipikas-projects.vercel.app/`): response carries `cross-origin-opener-policy: same-origin` and `cross-origin-embedder-policy: require-corp`; served `index.icon.png` and `index.pck` SHA-256 hashes match the local build byte-for-byte; a real browser session booted the engine under the new isolation headers, clicked Start on the title screen and reached running gameplay ("3 m / 0 hits" HUD, first wave visible). Desktop-browser proof only; not a phone or full-chain live re-run.
 - Not proven: human playtest of the multiplier feel, phone behavior, cross-browser GPU matrix, style variety enforcement (combo counts any successes, not distinct action types — simplification recorded in the plan).
 
 ## Review and publication status

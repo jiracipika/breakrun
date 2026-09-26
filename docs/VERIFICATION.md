@@ -84,6 +84,15 @@ Post-fix capture QC: no gate remains, obstacles read as separate depth-separated
 - Full `verify.py --render` pass: 11/11 suites, 239 assertions.
 - Not proven: real-device touch feel and ergonomics (still no physical phone in the loop).
 
+## Full-screen gestures slice
+
+- Control grammar per user direction: swipe anywhere to move/jump/slide (router already supported this), tap anywhere to counter (router's "" tap class now dispatches an attack attempt), bottom button bar deleted. Menu buttons (Start/Pause/Resume/Run again/Back to title) keep press-to-fire.
+- `test_input_scene.gd` (23 assertions): a tap anywhere fires a counter attempt (feedback shown), tiny movements never act as swipes and leave the pointer free, a mouse tap counters the recovering shield through the integrated scene without leaking into gesture routing, pause still fires on touch-down, panel pass-through swipe retained.
+- Counter-ready emphasis moved to the instruction bar ("COUNTER NOW · tap anywhere", pulsing, suppressed by reduced motion); the in-world gold counter ring is unchanged.
+- Full `verify.py --render` pass: 11/11 suites, 239 assertions. Chain reference 587 and capture choreography (Space counter) unchanged.
+- Design-plan deviation recorded: the "dedicated large lower-right attack button" contract in the original design is superseded by tap-to-counter. A future optional assist mode (button controls / wider timing windows) is tracked in NEXT.md rather than silently dropped.
+- Not proven: real-device feel and tap-to-counter discoverability — both belong to the human playtest gate.
+
 ## Review and publication status
 
 Independent spec-review attempt via delegate_task was blocked by GLM HTTP 429 (billing/credits exhausted). It did not review code. A read-only fallback through the installed Codex CLI failed with HTTP 401 because its refresh token had already been used; no authentication configuration was changed. Neither attempt supplies an independent approval.

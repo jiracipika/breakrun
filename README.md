@@ -26,12 +26,13 @@ If `godot` is not on PATH on macOS, use `/Applications/Godot.app/Contents/MacOS/
 
 ## Controls
 
-- A/D or arrows: change lane.
-- W/up: jump. S/down: slide.
-- Space: counter a shield after dodging its bash.
-- Escape: pause/resume.
-- Enter/Space/R: run again from the result screen; Escape there returns to the title.
-- Touch: swipe the track to move/jump/slide; the on-screen buttons respond on touch-down. UI touches must not also move the player.
+The whole screen is the controller, like other runners:
+
+- Swipe anywhere: left/right to change lane, up to jump, down to slide.
+- Tap anywhere: counter a shield after dodging its bash. A tap with no counter ready just shows a hint — it is never penalized.
+- Escape: pause/resume. Enter/Space/R: run again from the result screen; Escape there returns to the title.
+- Keyboard: A/D or arrows, W/up jump, S/down slide, Space counter.
+- Touch: everything above works by gesture; menu buttons (Start, Pause, Run again) stay as buttons. UI touches must not also move the player.
 
 Move out of the shield's marked lane during its bash, then counter from an adjacent lane while it recovers. A successful counter sends it back through its own checkpoint.
 
@@ -58,7 +59,7 @@ godot --headless --path . --export-release Web
 
 ![Actual Godot gameplay](docs/screenshots/gameplay.png)
 
-The first shield is always in the middle lane. Leave that lane as it winds up, then press Space or Counter during the open-ring recovery. Base scoring: counter 50, each dummy 100, barricade 150, clean hurdle pass 25. Uninterrupted successes raise a style multiplier (×1.00 to ×3.00, shown in the HUD) that scales every award, and damage resets it — chain reactions are the fastest way to score. Hits physically stagger you: the run lurches and briefly slows while you recover, and the enemy that hit you is knocked down, so contact costs momentum, not just a pip. After the two teaching waves, waves draw from seeded archetypes (counter-chain checkpoints, two-lane patrols, cross-lane fences), and jump/slide inputs pressed slightly early are buffered until they can fire. Speed ramps gently with distance and caps at 14 m/s so late runs stay readable. Every run draws a fresh seed (shown on the result screen — same seed, same run), while settings (sound, reduced motion) and best score persist between sessions.
+The first shield is always in the middle lane. Leave that lane as it winds up, then tap anywhere (or press Space) during the open-ring recovery. Base scoring: counter 50, each dummy 100, barricade 150, clean hurdle pass 25. Uninterrupted successes raise a style multiplier (×1.00 to ×3.00, shown in the HUD) that scales every award, and damage resets it — chain reactions are the fastest way to score. Hits physically stagger you: the run lurches and briefly slows while you recover, and the enemy that hit you is knocked down, so contact costs momentum, not just a pip. After the two teaching waves, waves draw from seeded archetypes (counter-chain checkpoints, two-lane patrols, cross-lane fences), and jump/slide inputs pressed slightly early are buffered until they can fire. Speed ramps gently with distance and caps at 14 m/s so late runs stay readable. Every run draws a fresh seed (shown on the result screen — same seed, same run), while settings (sound, reduced motion) and best score persist between sessions.
 
 ## Layout
 

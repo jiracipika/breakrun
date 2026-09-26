@@ -188,8 +188,8 @@ func _build_hud() -> void:
 	# is the controller now, and this teaches it until the player acts.
 	legend = panel(hud, Rect2(110, 630, 320, 104), Color(INK, 0.82))
 	legend.name = "Legend"
-	label(legend, "Swipe  ← →  move   ·   ↑ jump   ·   ↓ slide", Rect2(20, 18, 280, 30), 16)
-	label(legend, "Tap  —  counter", Rect2(20, 54, 280, 32), 20, GOLD)
+	label(legend, "Swipe — move · jump · slide", Rect2(20, 18, 280, 30), 18)
+	label(legend, "Tap — counter", Rect2(20, 54, 280, 32), 20, GOLD)
 	hud.visible = false
 
 func _build_overlays() -> void:

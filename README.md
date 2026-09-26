@@ -51,13 +51,13 @@ On this Mac, double-click `Launch BREAKRUN.command` to play. After copying this 
 godot --headless --path . --export-release Web
 ```
 
-`export_presets.cfg` targets the no-threads Web export into `web/` with a custom shell in `web_shell/index.html` (progress loader, feature check, DPR-capped canvas sizing, side help panel, touch hints). The build is a static site deployable to any static host (`vercel.json` and `.vercelignore` in this repo target Vercel). Desktop tests do not prove every browser/GPU pair; mobile browser performance in particular is untested.
+`export_presets.cfg` targets the no-threads Web export into `web/` with a custom shell in `web_shell/index.html` (progress loader, feature check, DPR-capped canvas sizing, side help panel, touch hints, social meta). The build is a static site deployable to any static host (`vercel.json` and `.vercelignore` in this repo target Vercel; cross-origin isolation headers are sent to match the export's requirements). The read-only `breakrunState` browser hook is compiled only into debug builds. Desktop tests do not prove every browser/GPU pair; mobile browser performance in particular is untested.
 
 ## Actual running build
 
 ![Actual Godot gameplay](docs/screenshots/gameplay.png)
 
-The first shield is always in the middle lane. Leave that lane as it winds up, then press Space or Counter during the open-ring recovery. Scoring: counter 50, each dummy 100, barricade 150, clean hurdle pass 25. Speed ramps gently with distance and caps at 14 m/s so late runs stay readable. Settings (sound, reduced motion) and best score persist between sessions; jump/slide now gate the low hurdle bars that follow each wave. Runs still reuse the same seed for reproducible playtesting.
+The first shield is always in the middle lane. Leave that lane as it winds up, then press Space or Counter during the open-ring recovery. Base scoring: counter 50, each dummy 100, barricade 150, clean hurdle pass 25. Uninterrupted successes raise a style multiplier (×1.00 to ×3.00, shown in the HUD) that scales every award, and damage resets it — chain reactions are the fastest way to score. Grounded contact with a hurdle now trips you; jump or slide the low bars that follow each wave. Speed ramps gently with distance and caps at 14 m/s so late runs stay readable. Every run draws a fresh seed (shown on the result screen — same seed, same run), while settings (sound, reduced motion) and best score persist between sessions.
 
 ## Layout
 

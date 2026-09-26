@@ -2,16 +2,18 @@
 
 Foundation complete: first physical chain, lifecycle, input routing, procedural art and repeatable verification. The full design remains a roadmap, not an implemented feature list.
 
-1. Human playtest the first shield without coaching. Can players identify the dodge lane, understand the adjacent counter, and repeat it intentionally? Capture specific confusion rather than adding content immediately.
+Resolved since this file was last rewritten: per-run seeds with result-screen replay codes (slice 003), style multiplier with HUD readout, cause-specific failure lines, original favicon + social meta, cross-origin isolation headers, `breakrunState` gated to debug builds, hurdle contact now matches the documented contract.
+
+1. Human playtest the first shield without coaching. Can players identify the dodge lane, understand the adjacent counter, and repeat it intentionally? Capture specific confusion rather than adding content immediately. Also watch whether the style multiplier makes chains feel worth chasing or just noise.
 2. Give the shield a stronger authored wind-up/lunge and the courier a clearer reaching kick. Current box-based limbs are a silhouette scaffold, not final character art. Improve perceived contact before adding particles.
 3. Introduce one jump/slide obstacle as a test-first authored encounter. Add actual lane traversal timing and validate reachability before combining hazards. Current logical lane selection is instantaneous while visual movement interpolates.
-4. Add original or licensed impact/run audio with independent mute. There is no sound in the current slice.
-5. Pool rendered enemy models and materials before increasing population. Current logic is bounded but visuals allocate at each new wave; this is acceptable only at current low population, not a production budget claim.
-6. Select a physical test phone, verify safe-area insets, touch ergonomics, left-handed controls, sustained frame time and thermal behavior. No phone build is presently verified.
-7. Add the other enemy types, boss and upgrades only after the shield interaction passes a human playtest.
+4. Pool rendered enemy models and materials before increasing population. Current logic is bounded but visuals allocate at each new wave; this is acceptable only at current low population, not a production budget claim.
+5. Select a physical test phone, verify safe-area insets, touch ergonomics, left-handed controls, sustained frame time and thermal behavior. No phone build is presently verified.
+6. Add the other enemy types, boss and upgrades only after the shield interaction passes a human playtest.
+7. Style-depth follow-up: the design's "varied actions" rule is currently simplified — combo counts any uninterrupted success, so repeated identical safe actions still grow the multiplier until the cap. Track action types if playtests show farming.
 
-Known scaffold limitations: repeated flat rooftop runway rather than parkour chunks; fixed seed in UI; no persisted scores/settings; reduced-motion toggle only removes kick lean; no input buffer, assist mode, save system, export presets, leaderboard, replay or monetization. The distant decorative gantry remains fixed in the initial presentation and should be moved into the reusable chunk system with future environment work.
+Known scaffold limitations: repeated flat rooftop runway rather than parkour chunks; no input buffer, assist mode, save system, leaderboard, replay or monetization. The result screen shows the seed but there is no seed-entry UI to replay an exact run yet.
 
 Review policy: independent code review cannot be called passed when a provider returns a quota/billing error. Record the actual fallback review result or leave the gate outstanding.
 
-Web-specific follow-ups: no favicon set in project settings yet (default Godot icon is exported); Web Audio and touch ergonomics are untested on real phones; consider narrowing the exported pck further (vercel.json currently ships unthrottled). Also revisit runtime debug hooks (`breakrunState`) and keep them out of any future production build if they are not wanted.
+Web-specific follow-ups: the exported wasm is ~39 MB unstripped (custom stripped templates are future work); Web Audio and touch ergonomics are untested on real phones.

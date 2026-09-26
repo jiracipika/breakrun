@@ -57,6 +57,16 @@ A visual QC of fresh GL captures flagged three issues; all fixed and re-captured
 
 Post-fix capture QC: no gate remains, obstacles read as separate depth-separated items, no HUD regressions. Remaining noted items: player still sits close to the bottom control bar on short screens (framing test guards the 540x960 baseline only), and the shield robot could use a stronger color identity versus the barricade.
 
+## Style and variety slice (per-run seeds, multiplier, readable failure)
+
+- `test_style_slice.gd` (18 assertions): seed recorded and replayed (same seed → identical distance/score/combo after equal steps), distinct seeds → distinct wave-lane sequences, multiplier growth/cap/reset, reference chain score 50+125+150+262=587, best-combo tracking, and `last_hit_kind` recorded for shield/dummy/barrier/hurdle contact.
+- Contract repair: plan 002 documented "non-evaded hurdle contact still damages" but the shipped `continue` made hurdles harmless. Grounded contact inside the crossing window now trips the runner (airborne/sliding ticks never do); the jump-timing test was moved earlier so the whole crossing is airborne, mirroring an anticipatory jump.
+- Existing exact-score assertions updated for the multiplier (587) in `test_core_updates`, `test_core_regressions`, `test_input_scene`, `capture_scene` and `tools/verify.py`; all other suites unchanged and passing.
+- Presentation verified in fresh GL captures: HUD style readout fits its panel, result screen shows points/metres/(new!), counters/chains/best style, best score, seed, and a cause-specific failure line (custom result capture step added).
+- Full `verify.py --render` pass: 10/10 suites, 162 assertions. Web export rebuilt; exported `index.html` carries the original programmatic icon, favicon links and social meta. The `breakrunState` hook is compiled only into debug builds; release exports no longer ship it.
+- vercel.json now sends COOP/COEP headers to match the export's `ensureCrossOriginIsolationHeaders`; live-header check recorded below after deploy.
+- Not proven: human playtest of the multiplier feel, phone behavior, cross-browser GPU matrix, style variety enforcement (combo counts any successes, not distinct action types — simplification recorded in the plan).
+
 ## Review and publication status
 
 Independent spec-review attempt via delegate_task was blocked by GLM HTTP 429 (billing/credits exhausted). It did not review code. A read-only fallback through the installed Codex CLI failed with HTTP 401 because its refresh token had already been used; no authentication configuration was changed. Neither attempt supplies an independent approval.

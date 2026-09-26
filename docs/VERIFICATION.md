@@ -93,6 +93,15 @@ Post-fix capture QC: no gate remains, obstacles read as separate depth-separated
 - Design-plan deviation recorded: the "dedicated large lower-right attack button" contract in the original design is superseded by tap-to-counter. A future optional assist mode (button controls / wider timing windows) is tracked in NEXT.md rather than silently dropped.
 - Not proven: real-device feel and tap-to-counter discoverability — both belong to the human playtest gate.
 
+## Teach, distinguish, celebrate slice (007)
+
+- Gesture legend (test-first, `test_scene.gd` 19 assertions): translucent panel in the space the button bar vacated shows the swipe/tap grammar at run start, hides on the player's first action and after 5 s of running — addressing tap-to-counter discoverability.
+- Counter celebration (test-first, `test_input_scene.gd` 25 assertions): successful counter kicks camera FOV +6 easing back to exactly base, plus six opaque paper/saffron impact shards from the counter lane; both suppressed by reduced motion and cleared on restart.
+- Shield identity: paper-framed teal plate (distinct silhouette from the cobalt/saffron barrier) with a coral head beacon; bash lunge now translates toward the player, not just tilts.
+- Bug found by capture review: the gold dodge-warning lane re-triggered for an already-launched shield flying back through the z 6–12 band, stamping a phantom gold slab beside the runner after every counter — warning now requires `phase == "approach"`. Launched shields also tumble away at 62% scale so the framed plate cannot read as a flat slab.
+- Full `verify.py --render` pass: 11/11 suites, 245 assertions. LIVE markers unchanged.
+- Not proven: real-device feel; whether the legend measurably improves first-run understanding (human playtest gate).
+
 ## Review and publication status
 
 Independent spec-review attempt via delegate_task was blocked by GLM HTTP 429 (billing/credits exhausted). It did not review code. A read-only fallback through the installed Codex CLI failed with HTTP 401 because its refresh token had already been used; no authentication configuration was changed. Neither attempt supplies an independent approval.

@@ -38,6 +38,9 @@ func _process(_delta: float) -> bool:
 		game.get_node("Interface/Title/StartButton").pressed.emit()
 	if frames > 30 and frames < 316:
 		game._physics_process(1.0 / 60.0)
+	if frames == 60:
+		# Legend is up before the first scripted input hides it at frame 80.
+		capture("legend")
 	if frames == 80:
 		key(KEY_D)
 	if frames == 150:

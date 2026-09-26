@@ -77,6 +77,13 @@ Post-fix capture QC: no gate remains, obstacles read as separate depth-separated
 - Full `verify.py --render` pass: 11/11 suites, 235 assertions. Chain reference 587 unchanged (teaching wave untouched by archetype variety).
 - Not proven: human feel of stagger tuning (duration/slowdown are first-pass values), phone behavior, cross-browser matrix.
 
+## Touch ergonomics slice
+
+- `test_input_scene.gd` (23 assertions): a mouse press alone on Jump fires the jump before any release (buttons use `ACTION_MODE_BUTTON_PRESS`); a swipe starting on the instruction panel reaches the track (panels are `MOUSE_FILTER_IGNORE` — this was a true red before the fix, panels consumed the drag); the disabled Counter carries its own stylebox override; Jump/Slide report disabled outside play.
+- Capture review: wider bottom-bar targets (Jump/Slide 124×68, Counter 188×78) with clear gaps, inverted press feedback, dimmed custom disabled state while paused, and the counter-available pulse (suppressed by reduced motion). Hint copy no longer advertises keyboard keys.
+- Full `verify.py --render` pass: 11/11 suites, 239 assertions.
+- Not proven: real-device touch feel and ergonomics (still no physical phone in the loop).
+
 ## Review and publication status
 
 Independent spec-review attempt via delegate_task was blocked by GLM HTTP 429 (billing/credits exhausted). It did not review code. A read-only fallback through the installed Codex CLI failed with HTTP 401 because its refresh token had already been used; no authentication configuration was changed. Neither attempt supplies an independent approval.

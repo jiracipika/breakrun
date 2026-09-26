@@ -31,7 +31,7 @@ If `godot` is not on PATH on macOS, use `/Applications/Godot.app/Contents/MacOS/
 - Space: counter a shield after dodging its bash.
 - Escape: pause/resume.
 - Enter/Space/R: run again from the result screen; Escape there returns to the title.
-- Touch: swipe on the track to move/jump/slide; use the separate Counter button to attack. UI touches must not also move the player.
+- Touch: swipe the track to move/jump/slide; the on-screen buttons respond on touch-down. UI touches must not also move the player.
 
 Move out of the shield's marked lane during its bash, then counter from an adjacent lane while it recovers. A successful counter sends it back through its own checkpoint.
 

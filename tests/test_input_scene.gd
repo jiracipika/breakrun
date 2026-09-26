@@ -113,6 +113,28 @@ func run() -> void:
 	game._sync_ui()
 	key(KEY_ESCAPE)
 	check(game.model.state == "title", "Escape returns to title from the result screen")
+	# Touch ergonomics: actions land on touch-down, panels pass drags through.
+	game.start_run()
+	touch(0, Vector2(240, 180), true)
+	touch(0, Vector2(350, 180), false)
+	check(game.model.lane == 1, "swipe starting on the instruction panel reaches the track")
+	game.start_run()
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	press.position = game.jump_button.get_global_rect().get_center()
+	root.push_input(press, true)
+	game._physics_process(0.1)
+	check(game.model.height > 0.0, "jump fires on touch-down, not release")
+	var release := InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT
+	release.pressed = false
+	release.position = press.position
+	root.push_input(release, true)
+	game.model.state = "paused"
+	game._sync_ui()
+	check(game.attack_button.has_theme_stylebox_override("disabled"), "counter button has a disabled style")
+	check(game.jump_button.disabled and game.slide_button.disabled, "jump and slide dim outside play")
 	print("INPUT: %d/%d checks passed" % [checks - failures, checks])
 	game.free()
 	quit(1 if failures else 0)

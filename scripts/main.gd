@@ -23,6 +23,8 @@ var distance_label: Label
 var instruction: Label
 var result_label: Label
 var attack_button: Button
+var jump_button: Button
+var slide_button: Button
 var enemy_nodes: Dictionary = {}
 var counter_ring: MeshInstance3D
 var warning_lane: MeshInstance3D
@@ -100,6 +102,8 @@ func panel(parent: Node, rect: Rect2, color: Color = PANEL) -> Panel:
 	var node := Panel.new()
 	node.position = rect.position
 	node.size = rect.size
+	# Panels must never consume drags: swipes can start anywhere on the track.
+	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := StyleBoxFlat.new()
 	style.bg_color = color
 	style.corner_radius_top_left = 5
@@ -126,13 +130,22 @@ func button(parent: Node, text: String, rect: Rect2, action: Callable, primary: 
 	node.text = text
 	node.position = rect.position
 	node.size = rect.size
+	# Runner inputs land on touch-down; release-only buttons feel laggy.
+	node.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	node.add_theme_font_size_override("font_size", 21)
 	node.add_theme_color_override("font_color", INK if primary else PAPER)
-	for state in ["normal", "hover", "pressed", "focus"]:
+	node.add_theme_color_override("font_disabled_color", Color(PAPER, 0.45))
+	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
 		var style := StyleBoxFlat.new()
-		style.bg_color = GOLD if primary else PANEL
+		if state == "pressed":
+			# Press inverts the palette so every tap is visibly acknowledged.
+			style.bg_color = PAPER if primary else PANEL.lightened(0.28)
+		elif state == "disabled":
+			style.bg_color = Color("16161f")
+		else:
+			style.bg_color = GOLD if primary else PANEL
 		style.border_color = PAPER
-		style.set_border_width_all(2 if state == "focus" or state == "hover" else 0)
+		style.set_border_width_all(2 if state in ["focus", "hover", "pressed"] else 0)
 		style.set_corner_radius_all(5)
 		node.add_theme_stylebox_override(state, style)
 	if action.is_valid():
@@ -169,10 +182,10 @@ func _build_hud() -> void:
 	instruction = label(hud, "", Rect2(40, 150, 456, 58), 20)
 	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel(hud, Rect2(24, 782, 492, 150), INK)
-	label(hud, "Swipe to move  /  A D · W S · Space", Rect2(40, 795, 460, 26), 17)
-	button(hud, "Jump", Rect2(40, 843, 107, 65), dispatch_action.bind("jump"))
-	button(hud, "Slide", Rect2(158, 843, 107, 65), dispatch_action.bind("slide"))
-	attack_button = button(hud, "Counter", Rect2(280, 833, 218, 75), dispatch_action.bind("attack"), true)
+	label(hud, "Swipe the track to move  /  tap the buttons", Rect2(40, 795, 460, 26), 17)
+	jump_button = button(hud, "Jump", Rect2(40, 843, 124, 68), dispatch_action.bind("jump"))
+	slide_button = button(hud, "Slide", Rect2(176, 843, 124, 68), dispatch_action.bind("slide"))
+	attack_button = button(hud, "Counter", Rect2(312, 833, 188, 78), dispatch_action.bind("attack"), true)
 	attack_button.name = "CounterButton"
 	hud.visible = false
 
@@ -427,8 +440,14 @@ func _sync_ui() -> void:
 			last_sound_feedback = "clean" + str(model.score)
 			play_sound("clean")
 	instruction.text = text
+	jump_button.disabled = model.state != "running"
+	slide_button.disabled = model.state != "running"
 	attack_button.text = "Counter NOW" if ready_to_counter else "Counter"
 	attack_button.disabled = model.state != "running"
+	if ready_to_counter and not reduced_motion and model.state == "running":
+		attack_button.modulate.a = 0.72 + 0.28 * sin(model.time * 12.0)
+	else:
+		attack_button.modulate.a = 1.0
 
 func _sync_world(delta: float) -> void:
 	var blend: float = minf(1.0, delta * 16.0)

@@ -37,6 +37,8 @@ var best_score: int = 0
 var muted: bool = false
 var audio_players: Dictionary = {}
 var last_sound_feedback: String = ""
+## Deterministic-run hook for tests and rendered capture. 0 = each run draws a fresh seed.
+var fixed_seed: int = 0
 
 
 func _ready() -> void:
@@ -209,14 +211,19 @@ func _build_overlays() -> void:
 	interface.add_child(result_overlay)
 	panel(result_overlay, Rect2(24, 291, 492, 415), INK)
 	label(result_overlay, "ONE MORE RUN?", Rect2(48, 308, 440, 62), 48, GOLD)
-	result_label = label(result_overlay, "", Rect2(48, 385, 440, 120), 22)
-	button(result_overlay, "Run again", Rect2(48, 530, 444, 64), start_run, true)
-	button(result_overlay, "Back to title", Rect2(48, 615, 444, 60), return_to_title)
+	result_label = label(result_overlay, "", Rect2(48, 385, 440, 150), 22)
+	result_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	button(result_overlay, "Run again", Rect2(48, 545, 444, 64), start_run, true)
+	button(result_overlay, "Back to title", Rect2(48, 625, 444, 60), return_to_title)
 	result_overlay.visible = false
+
+func _fresh_seed() -> int:
+	# Global RNG is entropy-seeded in Godot 4; mix the clock so rapid restarts differ.
+	return absi(int(Time.get_ticks_usec()) ^ randi())
 
 func start_run() -> void:
 	gestures.cancel()
-	model.start(42)
+	model.start(fixed_seed if fixed_seed != 0 else _fresh_seed())
 	previous_counters = 0
 	previous_hp = 3
 	kick_timer = 0.0
@@ -359,12 +366,26 @@ func _physics_process(delta: float) -> void:
 	else:
 		hit_flash.visible = false
 	_sync_ui()
-	if OS.has_feature("web"):
+	# Read-only observability for local debugging; kept out of release exports.
+	if OS.has_feature("web") and OS.is_debug_build():
 		_web_status_elapsed += delta
 		if _web_status_elapsed >= 0.1:
 			_web_status_elapsed = 0.0
-			# Read-only observability; no browser command mutates the simulation.
 			JavaScriptBridge.eval("window.breakrunState = " + JSON.stringify({"state": model.state, "lane": model.lane, "distance": model.distance, "hp": model.hp, "score": model.score, "counters": model.counter_count, "chains": model.chain_count, "hint": instruction.text}) + ";")
+
+## Readable failure: name what ended the run and its remedy, not a generic goodbye.
+func _failure_line() -> String:
+	match model.last_hit_kind:
+		"shield":
+			return "Shield bash caught you — counter it."
+		"dummy":
+			return "A robot clipped you — counter clears."
+		"barrier":
+			return "A barrier hit you — launch a shield."
+		"hurdle":
+			return "A hurdle tripped you — jump or slide."
+		_:
+			return "Dodge first. Counter the open ring."
 
 func _sync_ui() -> void:
 	title.visible = model.state == "title"
@@ -373,11 +394,13 @@ func _sync_ui() -> void:
 	result_overlay.visible = model.state == "dead"
 	life_label.text = "● ".repeat(maxi(0, model.hp))
 	score_label.text = "%04d" % model.score
-	distance_label.text = "%d m  /  %d hits" % [int(model.distance), model.combo]
+	var style: String = "  ·  ×%.2f" % model.style_multiplier() if model.combo > 0 else ""
+	distance_label.text = "%d m / %d hits%s" % [int(model.distance), model.combo, style]
 	if model.state == "dead" and model.score > best_score:
 		best_score = model.score
 		_save_settings()
-	result_label.text = "%d points   ·   %d metres\n%d counters   ·   %d chains\nBest: %d\nDodge first. Counter the open ring." % [model.score, int(model.distance), model.counter_count, model.chain_count, best_score]
+	var best_mark: String = "  (new!)" if model.state == "dead" and model.score == best_score and model.score > 0 else ""
+	result_label.text = "%d points · %d metres%s\nCounters %d · Chains %d · best ×%.2f\nBest: %d · Seed %d\n%s" % [model.score, int(model.distance), best_mark, model.counter_count, model.chain_count, model.style_multiplier(), best_score, model.run_seed, _failure_line()]
 	var text: String = "Move out of the shield's lane when it winds up."
 	var ready_to_counter: bool = false
 	for e in model.enemies:

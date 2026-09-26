@@ -44,7 +44,7 @@ func _init() -> void:
 	while traveled < 4.0 and chain.feedback_time > 0.0:
 		chain.step(1.0 / 120.0)
 		traveled += 1.0 / 120.0
-	check(chain.chain_count == 1 and chain.score == 400, "chain still completes on the ramp")
+	check(chain.chain_count == 1 and chain.score == 587, "chain still completes on the ramp")
 	# Hurdles.
 	var h = Model.new()
 	h.start(42)
@@ -66,8 +66,9 @@ func _init() -> void:
 		if e.kind == "hurdle": hj = e
 	check(hj != null, "hurdle exists for jump test")
 	if hj != null:
-		# Step to just before the hurdle line, then jump over it.
-		while hj.z > 1.2:
+		# Step to jump range, then jump so the whole crossing is airborne.
+		# A grounded tick inside the contact window now trips the runner.
+		while hj.z > 2.6:
 			j.step(1.0 / 120.0)
 		j.act("jump")
 		var hp_before: int = j.hp

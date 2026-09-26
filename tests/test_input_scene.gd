@@ -46,6 +46,7 @@ func run() -> void:
 	game = load("res://scenes/main.tscn").instantiate()
 	root.add_child(game)
 	game.set_physics_process(false)
+	game.fixed_seed = 42
 	game.start_run()
 	key(KEY_D)
 	check(game.model.lane == 1, "real keyboard input changes lane")
@@ -84,7 +85,7 @@ func run() -> void:
 	check(game.model.counter_count == 1, "keyboard dodge and counter work in integrated scene")
 	for i in range(60):
 		game._physics_process(1.0 / 60.0)
-	check(game.model.chain_count == 1 and game.model.score == 400, "projectile clears checkpoint through integrated scene")
+	check(game.model.chain_count == 1 and game.model.score == 587, "projectile clears checkpoint through integrated scene")
 	game.return_to_title()
 	var start_button: Button = game.get_node("Interface/Title/StartButton")
 	mouse_click(start_button.get_global_rect().get_center())

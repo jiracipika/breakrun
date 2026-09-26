@@ -55,7 +55,7 @@ func _init() -> void:
 	while traveled < 4.0 and model.feedback_time > 0.0:
 		model.step(1.0 / 120.0)
 		traveled += 1.0 / 120.0
-	check(model.score == 400, "chain clears exactly counter 50 + two dummies 100 + barricade 150")
+	check(model.score == 587, "chain scores counter 50 + styled hits 125/150/262")
 	var score_before: int = model.score
 	model.act("attack")
 	check(model.score == score_before, "duplicate attack adds no score")

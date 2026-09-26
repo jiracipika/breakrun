@@ -27,6 +27,9 @@ var enemies: Array = []
 var counter_count: int = 0
 var chain_count: int = 0
 var last_counter_lane: int = 0
+var run_seed: int = 42
+var last_hit_kind: String = ""
+var best_combo: int = 0
 var _rng := RandomNumberGenerator.new()
 var _next_id: int = 0
 var _next_wave_distance: float = WAVE_SPACING
@@ -36,6 +39,7 @@ var _slide: float = 0.0
 
 func start(seed_value: int = 42) -> void:
 	_rng.seed = seed_value
+	run_seed = seed_value
 	state = "running"
 	lane = 0
 	distance = 0.0
@@ -51,6 +55,8 @@ func start(seed_value: int = 42) -> void:
 	counter_count = 0
 	chain_count = 0
 	last_counter_lane = 0
+	last_hit_kind = ""
+	best_combo = 0
 	_next_id = 0
 	_next_wave_distance = WAVE_SPACING
 	_invulnerability = 0.0
@@ -93,6 +99,21 @@ func step(delta: float) -> void:
 func speed() -> float:
 	return minf(PLAYER_SPEED + distance * 0.02, MAX_SPEED)
 
+## Style multiplier: 1.0 at combo 0, +0.25 per uninterrupted success, capped at 3.0.
+func style_multiplier() -> float:
+	return 1.0 + 0.25 * mini(combo, 8)
+
+## Award for a score event at the current style level. Integer math keeps awards
+## exact and deterministic: base x (4 + combo, capped 8) / 4.
+func _event_score(base: int) -> int:
+	@warning_ignore("integer_division")
+	return base * (4 + mini(combo, 8)) / 4
+
+func _reward(base: int) -> void:
+	score += _event_score(base)
+	combo += 1
+	best_combo = maxi(best_combo, combo)
+
 func _tick(dt: float) -> void:
 	time += dt
 	var current_speed: float = speed()
@@ -130,8 +151,7 @@ func _tick(dt: float) -> void:
 				projectile["hits"] += 1
 				if projectile.hits == 1:
 					chain_count += 1
-				combo += 1
-				score += 150 if target.kind == "barrier" else 100
+				_reward(150 if target.kind == "barrier" else 100)
 				_message("Checkpoint cleared!" if projectile.hits >= 3 else "Chain x%d!" % projectile.hits, 1.5)
 	for e in enemies:
 		if e.phase == "cleared" or e.phase == "launched":
@@ -143,13 +163,14 @@ func _tick(dt: float) -> void:
 					if not e["rewarded"]:
 						e["rewarded"] = true
 						e.phase = "cleared"
-						score += HURDLE_BONUS
-						combo += 1
+						_reward(HURDLE_BONUS)
 						_message("Clean!", 0.8)
-				continue
+					continue
+				# Same lane without evasion trips the runner into the damage path.
 			if _invulnerability <= 0.0:
 				hp -= 1
 				combo = 0
+				last_hit_kind = e.kind
 				_invulnerability = 1.0
 				_message("Hit! Change lane before contact.", 1.5)
 				if hp <= 0:
@@ -193,7 +214,7 @@ func _try_counter() -> void:
 		nearest.phase = "launched"
 		counter_count += 1
 		last_counter_lane = nearest.lane
-		score += 50
+		_reward(50)
 		_message("Counter!", 1.0)
 
 func _message(text: String, duration: float) -> void:

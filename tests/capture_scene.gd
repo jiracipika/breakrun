@@ -12,6 +12,7 @@ func boot() -> void:
 	game = load("res://scenes/main.tscn").instantiate()
 	root.add_child(game)
 	game.set_physics_process(false)
+	game.fixed_seed = 42
 	DirAccess.make_dir_recursive_absolute("res://artifacts")
 
 func key(code: int) -> void:
@@ -49,7 +50,7 @@ func _process(_delta: float) -> bool:
 		capture("counter-launch")
 	if frames == 307:
 		capture("chain-complete")
-		if game.model.counter_count != 1 or game.model.chain_count != 1 or game.model.score != 400:
+		if game.model.counter_count != 1 or game.model.chain_count != 1 or game.model.score != 587:
 			printerr("FAIL: live rendered chain did not reach expected state")
 			errors += 1
 		print("LIVE: counters=%d chains=%d score=%d hp=%d" % [game.model.counter_count,game.model.chain_count,game.model.score,game.model.hp])
@@ -59,5 +60,14 @@ func _process(_delta: float) -> bool:
 		capture("paused")
 		if game.model.state != "paused":
 			errors += 1
+		key(KEY_ESCAPE)
+	if frames == 322:
+		# End the run deterministically to capture the new result screen.
+		game.model.hp = 1
+		game.model.last_hit_kind = "shield"
+		game.model.state = "dead"
+		game._sync_ui()
+	if frames == 330:
+		capture("result")
 		quit(1 if errors else 0)
 	return false

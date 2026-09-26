@@ -102,6 +102,14 @@ Post-fix capture QC: no gate remains, obstacles read as separate depth-separated
 - Full `verify.py --render` pass: 11/11 suites, 245 assertions. LIVE markers unchanged.
 - Not proven: real-device feel; whether the legend measurably improves first-run understanding (human playtest gate).
 
+## Stamp kicker slice (008)
+
+- `test_kicker.gd` (12 assertions): the high sweep catches grounded and airborne players in its lane (jumping does not clear it), sliding or another lane dodges and marks it resolvable, an undodged strike is refused with the slide hint, sliding into recovery earns the strike (base 50, counter count), the launched kicker trips the trailing dummy into a chain, and seeded waves produce the kicker. Damage funnels through a shared `_damage(kind)` helper.
+- New seeded **sweep** archetype (kicker, neighbor dummy, lane dummy, lane hurdle): striking the kicker trips the trailing lane dummy and the hurdle asks for the jump — a mini-chain that rewards the slide-then-strike habit. Impact-slice wave assertions generalized to "opens with a strike-able robot (shield or kicker), exactly one per wave."
+- Presentation: tall cobalt forked robot with a saffron `Foot` limb that swings through the sweep and a gold ground stripe telegraphing from z 16; the counter ring marks the strike window for both robots; instruction copy generalized and made font-safe; result screen names the kicker.
+- Full `verify.py --render` pass: 12/12 suites, 257 assertions. Chain reference 587 and LIVE-STAGGER unchanged; staged kicker capture verified visually.
+- Not proven: real-device feel; kicker readability/sweep timing in human hands (playtest gate).
+
 ## Review and publication status
 
 Independent spec-review attempt via delegate_task was blocked by GLM HTTP 429 (billing/credits exhausted). It did not review code. A read-only fallback through the installed Codex CLI failed with HTTP 401 because its refresh token had already been used; no authentication configuration was changed. Neither attempt supplies an independent approval.

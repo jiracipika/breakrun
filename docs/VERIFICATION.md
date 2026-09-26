@@ -110,6 +110,15 @@ Post-fix capture QC: no gate remains, obstacles read as separate depth-separated
 - Full `verify.py --render` pass: 12/12 suites, 257 assertions. Chain reference 587 and LIVE-STAGGER unchanged; staged kicker capture verified visually.
 - Not proven: real-device feel; kicker readability/sweep timing in human hands (playtest gate).
 
+## Spring courier slice (009)
+
+- `test_spring.gd` (15 assertions): the low sweep catches grounded AND sliding players in its lane (the kicker's answer fails here by design), jumping clears and marks it dodged, another lane dodges, a grounded strike is refused with "Strike it mid-air!", the aerial strike launches the courier (base 50), starts a `boost_count` boost that pushes `world_speed()` above the base ramp and decays back to exactly base after 1.2 s, and seeded waves include the courier.
+- Boost composes with stagger multiplicatively in `world_speed()`; base speed cap still applies before both factors. Seeded **spring** archetype pairs the courier with dummies.
+- Presentation: coiled courier art (teal body, coral head, paper foot rail) that crouches at telegraph and rakes its coil leg on the sweep; counter ring marks its recovery; rising "boost" chirp synthesized alongside the existing SFX; FOV eases +4 while boosting (reduced-motion gated); instruction copy ("JUMP — its sweep is low" / "STRIKE NOW · tap anywhere") and the result screen name the courier.
+- Delivered with delegated subagents: one finished presentation wiring + capture step and ran the suite; another updated README/NEXT.md in parallel. The code agent caught that the instruction-loop guard would have skipped springs entirely (dead copy) — fixed by extending the guard.
+- Full `verify.py --render` pass: 13/13 suites, 273 assertions. Chain reference 587, LIVE and LIVE-STAGGER markers unchanged; spring capture verified visually.
+- Not proven: real-device feel; jump-window timing in human hands (playtest gate).
+
 ## Review and publication status
 
 Independent spec-review attempt via delegate_task was blocked by GLM HTTP 429 (billing/credits exhausted). It did not review code. A read-only fallback through the installed Codex CLI failed with HTTP 401 because its refresh token had already been used; no authentication configuration was changed. Neither attempt supplies an independent approval.

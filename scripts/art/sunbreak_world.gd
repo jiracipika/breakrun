@@ -119,6 +119,17 @@ static func enemy(parent: Node3D, kind: String) -> Node3D:
 		box(stripe, Vector3(2.0, 0.03, 3.4), Vector3(0, 0.02, 1.9), SAFFRON)
 		box(stripe, Vector3(0.16, 0.035, 3.4), Vector3(-0.92, 0.03, 1.9), PAPER)
 		box(stripe, Vector3(0.16, 0.035, 3.4), Vector3(0.92, 0.03, 1.9), PAPER)
+	elif kind == "spring":
+		# Compact courier on a coil: crouches to telegraph, sweeps low,
+		# and springs away when struck mid-air.
+		box(actor, Vector3(0.56, 0.5, 0.44), Vector3(0, 1.28, 0), TEAL)
+		box(actor, Vector3(0.44, 0.26, 0.4), Vector3(0, 1.66, 0), CORAL)
+		box(actor, Vector3(0.13, 0.2, 0.05), Vector3(0, 1.66, 0.22), PAPER)
+		box(actor, Vector3(0.5, 0.13, 0.4), Vector3(0, 0.95, 0), COBALT)
+		box(actor, Vector3(0.38, 0.13, 0.34), Vector3(0, 0.78, 0), COBALT)
+		box(actor, Vector3(0.26, 0.13, 0.28), Vector3(0, 0.61, 0), COBALT)
+		box(actor, Vector3(0.52, 0.1, 0.48), Vector3(0, 0.5, 0), PAPER)
+		limb(actor, "SweepLeg", Vector3(0, 0.32, 0.24), Vector3(0.56, 0.18, 0.5), SAFFRON)
 	else:
 		var sway: float = 0.22 if kind == "dummy" else 0.0
 		box(actor, Vector3(0.7, 0.85, 0.48), Vector3(sway, 1.05, 0), TEAL)

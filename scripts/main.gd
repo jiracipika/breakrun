@@ -32,6 +32,7 @@ var counter_ring: MeshInstance3D
 var warning_lane: MeshInstance3D
 var kick_timer: float = 0.0
 var previous_counters: int = 0
+var previous_boosts: int = 0
 var reduced_motion: bool = false
 var _web_status_elapsed: float = 0.0
 var hit_flash: ColorRect
@@ -241,6 +242,7 @@ func start_run() -> void:
 	gestures.cancel()
 	model.start(fixed_seed if fixed_seed != 0 else _fresh_seed())
 	previous_counters = 0
+	previous_boosts = 0
 	previous_hp = 3
 	kick_timer = 0.0
 	_legend_age = 0.0
@@ -329,7 +331,7 @@ func _notification(what: int) -> void:
 
 func _build_audio() -> void:
 	# Original procedural blips synthesized at startup. No external audio assets.
-	for name in ["counter", "hit", "chain", "clean"]:
+	for name in ["counter", "hit", "chain", "clean", "boost"]:
 		var tone: AudioStreamWAV = AudioStreamWAV.new()
 		var rate: int = 22050
 		var length: int = int(rate * 0.18)
@@ -344,10 +346,13 @@ func _build_audio() -> void:
 			base_frequency = 440.0
 		elif name == "clean":
 			base_frequency = 880.0
+		elif name == "boost":
+			base_frequency = 520.0
 		for i in range(length):
 			var progress: float = float(i) / length
 			var envelope: float = 1.0 - progress
-			var frequency: float = base_frequency * (1.0 + 0.5 * progress if name == "counter" else 1.0)
+			var rises: bool = name == "counter" or name == "boost"
+			var frequency: float = base_frequency * (1.0 + 0.5 * progress if rises else 1.0)
 			var sample: float = sin(TAU * frequency * i / rate) * envelope * 0.4
 			var value: int = int(clampf(sample, -1.0, 1.0) * 32767.0)
 			data.encode_s16(i * 2, value)
@@ -387,6 +392,9 @@ func _physics_process(delta: float) -> void:
 	if model.counter_count > previous_counters:
 		previous_counters = model.counter_count
 		play_sound("counter")
+	if model.boost_count > previous_boosts:
+		previous_boosts = model.boost_count
+		play_sound("boost")
 	if model.hp < previous_hp:
 		previous_hp = model.hp
 		hit_flash_time = 0.22
@@ -418,6 +426,8 @@ func _failure_line() -> String:
 			return "Shield bash caught you — counter it."
 		"kicker":
 			return "A stamp sweep caught you — slide under it."
+		"spring":
+			return "A low sweep caught you — jump it."
 		"dummy":
 			return "A robot clipped you — counter clears."
 		"barrier":
@@ -468,11 +478,17 @@ func _sync_ui() -> void:
 	var text: String = "Move out of the shield's lane when it winds up."
 	var ready_to_counter: bool = false
 	for e in model.enemies:
-		if (e.kind != "shield" and e.kind != "kicker") or e.phase == "launched" or e.phase == "cleared":
+		if (e.kind != "shield" and e.kind != "kicker" and e.kind != "spring") or e.phase == "launched" or e.phase == "cleared":
 			continue
 		if e.kind == "kicker":
 			if e.z <= 16 and e.z > 9:
 				text = "SWEEP!  Slide the striped lane"
+			if e.z <= 6 and e.z >= 2 and e.dodged:
+				text = "STRIKE NOW  ·  tap anywhere"
+				ready_to_counter = absi(int(e.lane) - model.lane) <= 1
+		elif e.kind == "spring":
+			if e.z <= 16 and e.z > 9:
+				text = "JUMP  —  its sweep is low"
 			if e.z <= 6 and e.z >= 2 and e.dodged:
 				text = "STRIKE NOW  ·  tap anywhere"
 				ready_to_counter = absi(int(e.lane) - model.lane) <= 1
@@ -520,10 +536,14 @@ func _sync_world(delta: float) -> void:
 	if kick_timer > 0 and not reduced_motion:
 		runner.get_node("LegR").rotation.x = -1.6
 		runner.rotation.z = 0.23 * (model.lane - model.last_counter_lane)
-		camera.fov = 62.0 + 6.0 * (kick_timer / 0.32)
 	else:
 		runner.rotation.z = 0.0
-		camera.fov = 62.0
+	# Counter kick punches the view wider; a boost eases it wider still.
+	var fov_kick: float = 0.0
+	if kick_timer > 0 and not reduced_motion:
+		fov_kick = 6.0 * (kick_timer / 0.32)
+	var fov_boost: float = 0.0 if reduced_motion else 4.0 * model.boost_ratio()
+	camera.fov = 62.0 + fov_kick + fov_boost
 	_update_bursts(delta)
 	var index: int = 0
 	for tile in world.get_node("Tiles").get_children():
@@ -563,6 +583,13 @@ func _sync_world(delta: float) -> void:
 			var kicker_foot: Node3D = actor.get_node_or_null("Foot")
 			if kicker_foot != null:
 				kicker_foot.rotation.x = -1.9 - 0.5 * sin(model.time * 20.0)
+			# Low sweep: the courier's coil leg rakes the ground.
+			var spring_leg: Node3D = actor.get_node_or_null("SweepLeg")
+			if spring_leg != null:
+				spring_leg.rotation.x = 1.2 + 0.4 * sin(model.time * 22.0)
+		elif enemy.kind == "spring" and enemy.phase == "approach" and enemy.z <= 16.0:
+			# Coil crouches to telegraph the low sweep.
+			actor.scale.y = 0.72
 		elif enemy.phase == "bash":
 			# Forward lunge wind-up: rocks toward the player as it attacks.
 			actor.rotation.x = -0.20 - 0.16 * sin(model.time * 18.0)
@@ -579,7 +606,7 @@ func _sync_world(delta: float) -> void:
 			var stripe: Node3D = actor.get_node_or_null("Stripe")
 			if stripe != null:
 				stripe.visible = (enemy.phase == "approach" or enemy.phase == "sweep") and enemy.z <= 16.0
-		if (enemy.kind == "shield" or enemy.kind == "kicker") and enemy.phase == "recovery" and enemy.z >= 2:
+		if (enemy.kind == "shield" or enemy.kind == "kicker" or enemy.kind == "spring") and enemy.phase == "recovery" and enemy.z >= 2:
 			counter_ring.visible = true
 			counter_ring.position = Vector3(enemy.lane * 2.5, 0.06, -enemy.z)
 	for id in enemy_nodes.keys():

@@ -74,6 +74,13 @@ func _process(_delta: float) -> bool:
 			1 if (crashed != null and crashed.phase == "cleared") else 0,
 			1 if game.model.stagger_ratio() > 0.0 else 0])
 		capture("stagger")
+	if frames == 310:
+		# Stage the spring in its telegraph band; capture before the kicker stages.
+		game.model.enemies.append({"id": 997, "kind": "spring", "lane": game.model.lane,
+			"z": 12.5, "phase": "approach", "dodged": false, "age": 0.0,
+			"hits": 0, "rewarded": false, "swept": false, "previous_z": 12.5})
+	if frames == 312:
+		capture("spring")
 	if frames == 313:
 		# Stage a kicker during its telegraph; capture after the stagger flash
 		# has fully faded so the robot and stripe read cleanly.

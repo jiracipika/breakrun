@@ -14,6 +14,10 @@ const COUNTER_MAX_Z: float = 6.0
 const KICKER_TELEGRAPH_Z: float = 16.0
 const KICKER_SWEEP_Z: float = 9.0
 const KICKER_RECOVERY_Z: float = 6.0
+const SPRING_SWEEP_Z: float = 9.0
+const SPRING_RECOVERY_Z: float = 6.0
+const BOOST_TIME: float = 1.2
+const BOOST_MULT: float = 0.35
 const STAGGER_TIME: float = 1.0
 const STAGGER_SLOWDOWN: float = 0.8
 const INPUT_BUFFER: float = 0.25
@@ -23,6 +27,7 @@ const CHECKPOINT_WAVE: Array = [["shield", 0.0], ["dummy", 6.0], ["dummy", 12.0]
 const PATROL_WAVE: Array = [["shield", 0.0], ["dummy", 6.0], ["dummy", 12.0], ["dummy", 18.0]]
 const FENCE_WAVE: Array = [["shield", 0.0], ["barrier", 8.0], ["hurdle", 16.0]]
 const SWEEP_WAVE: Array = [["kicker", 0.0], ["dummy", 6.0], ["dummy", 12.0], ["hurdle", 18.0]]
+const SPRING_WAVE: Array = [["spring", 0.0], ["dummy", 6.0], ["dummy", 12.0], ["dummy", 18.0]]
 
 var state: String = "title"
 var lane: int = 0
@@ -42,7 +47,9 @@ var last_counter_lane: int = 0
 var run_seed: int = 42
 var last_hit_kind: String = ""
 var best_combo: int = 0
+var boost_count: int = 0
 var _stagger: float = 0.0
+var _boost: float = 0.0
 var _buffered_action: String = ""
 var _buffer_time: float = 0.0
 var _waves_spawned: int = 0
@@ -73,7 +80,9 @@ func start(seed_value: int = 42) -> void:
 	last_counter_lane = 0
 	last_hit_kind = ""
 	best_combo = 0
+	boost_count = 0
 	_stagger = 0.0
+	_boost = 0.0
 	_buffered_action = ""
 	_buffer_time = 0.0
 	_waves_spawned = 0
@@ -123,16 +132,26 @@ func step(delta: float) -> void:
 func speed() -> float:
 	return minf(PLAYER_SPEED + distance * 0.02, MAX_SPEED)
 
-## World speed with the hit-stagger slowdown applied. Player, enemies and
-## projectiles all move at this, so a stumble reads as the whole run lurching.
+## World speed with the hit-stagger slowdown and courier boost applied. Player,
+## enemies and projectiles all move at this, so stumbles and boosts read as the
+## whole run lurching or surging.
 func world_speed() -> float:
-	if _stagger <= 0.0:
+	var factor: float = 1.0
+	if _stagger > 0.0:
+		factor *= 1.0 - STAGGER_SLOWDOWN * (_stagger / STAGGER_TIME)
+	if _boost > 0.0:
+		factor *= 1.0 + BOOST_MULT * (_boost / BOOST_TIME)
+	if factor == 1.0:
 		return speed()
-	return speed() * (1.0 - STAGGER_SLOWDOWN * (_stagger / STAGGER_TIME))
+	return speed() * factor
 
 ## 1.0 right after a hit, easing to 0.0 as the stagger recovers.
 func stagger_ratio() -> float:
 	return clampf(_stagger / STAGGER_TIME, 0.0, 1.0)
+
+## 1.0 right after an aerial strike, easing to 0.0 as the boost fades.
+func boost_ratio() -> float:
+	return clampf(_boost / BOOST_TIME, 0.0, 1.0)
 
 ## Style multiplier: 1.0 at combo 0, +0.25 per uninterrupted success, capped at 3.0.
 func style_multiplier() -> float:
@@ -184,6 +203,7 @@ func _tick(dt: float) -> void:
 	_slide = maxf(0.0, _slide - dt)
 	_invulnerability = maxf(0.0, _invulnerability - dt)
 	_stagger = maxf(0.0, _stagger - dt)
+	_boost = maxf(0.0, _boost - dt)
 	_buffer_time = maxf(0.0, _buffer_time - dt)
 	if _buffer_time == 0.0:
 		_buffered_action = ""
@@ -218,6 +238,18 @@ func _tick(dt: float) -> void:
 					else:
 						# The sweep is high: jumping does not clear it.
 						_damage("kicker")
+		elif e.kind == "spring" and e.phase != "cleared":
+			if e.z <= SPRING_RECOVERY_Z:
+				e.phase = "recovery"
+			elif e.z <= SPRING_SWEEP_Z:
+				e.phase = "sweep"
+				if not e["swept"]:
+					e["swept"] = true
+					if e.lane != lane or height > 0.5:
+						# The sweep is low: only air clears it.
+						e.dodged = true
+					else:
+						_damage("spring")
 	# Advance projectiles before testing ordinary contact. Each target scores once.
 	for projectile in enemies:
 		if projectile.phase != "launched":
@@ -267,7 +299,7 @@ func _spawn_wave(z: float) -> void:
 	if _waves_spawned >= 1:
 		target_lane = _rng.randi_range(-1, 1)
 	if _waves_spawned >= 2:
-		match _rng.randi_range(0, 3):
+		match _rng.randi_range(0, 4):
 			0:
 				archetype = PATROL_WAVE
 			1:
@@ -275,6 +307,8 @@ func _spawn_wave(z: float) -> void:
 			2:
 				archetype = SWEEP_WAVE
 			3:
+				archetype = SPRING_WAVE
+			4:
 				pass
 	var neighbor: int = clampi(target_lane + (1 if target_lane <= 0 else -1), -1, 1)
 	for i in range(archetype.size()):
@@ -283,6 +317,8 @@ func _spawn_wave(z: float) -> void:
 		if archetype == PATROL_WAVE and i == 2:
 			lane = neighbor
 		elif archetype == SWEEP_WAVE and i == 1:
+			lane = neighbor
+		elif archetype == SPRING_WAVE and (i == 1 or i == 2):
 			lane = neighbor
 		elif archetype == FENCE_WAVE and i == 1:
 			lane = neighbor
@@ -299,7 +335,7 @@ func _try_counter() -> void:
 	for e in enemies:
 		if e.phase == "launched" and feedback_time > 0.0:
 			return # Repeated taps must not overwrite earned success feedback.
-		var strikeable: bool = (e.kind == "shield" or e.kind == "kicker") and e.phase != "cleared" and e.phase != "launched"
+		var strikeable: bool = (e.kind == "shield" or e.kind == "kicker" or e.kind == "spring") and e.phase != "cleared" and e.phase != "launched"
 		if strikeable:
 			if nearest.is_empty() or e.z < nearest.z:
 				nearest = e
@@ -310,7 +346,14 @@ func _try_counter() -> void:
 	elif nearest.z < COUNTER_MIN_Z:
 		_message("Too late. Counter while the ring is open.", 0.8)
 	elif not nearest.dodged:
-		_message("Slide under its sweep first!" if nearest.kind == "kicker" else "Dodge its bash first!", 0.8)
+		if nearest.kind == "kicker":
+			_message("Slide under its sweep first!", 0.8)
+		elif nearest.kind == "spring":
+			_message("Jump its low sweep first!", 0.8)
+		else:
+			_message("Dodge its bash first!", 0.8)
+	elif nearest.kind == "spring" and height <= 0.5:
+		_message("Strike it mid-air!", 0.8)
 	elif absi(int(nearest.lane) - lane) > 1:
 		_message("Move beside it to counter.", 0.8)
 	else:
@@ -318,7 +361,13 @@ func _try_counter() -> void:
 		counter_count += 1
 		last_counter_lane = nearest.lane
 		_reward(50)
-		_message("Swept!" if nearest.kind == "kicker" else "Counter!", 1.0)
+		if nearest.kind == "spring":
+			# The courier springs away and shoves the runner forward.
+			boost_count += 1
+			_boost = BOOST_TIME
+			_message("Boost!", 1.0)
+		else:
+			_message("Swept!" if nearest.kind == "kicker" else "Counter!", 1.0)
 
 func _message(text: String, duration: float) -> void:
 	feedback = text

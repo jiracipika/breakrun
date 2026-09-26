@@ -119,7 +119,7 @@ func _init() -> void:
 		"first wave is the teaching checkpoint")
 	check(groups[1].size() == 5 and groups[1][0].kind == "shield", "second wave keeps the teaching shape")
 	var valid_sizes := {5: true, 4: true, 3: true}
-	var strikeable := ["shield", "kicker"]
+	var strikeable := ["shield", "kicker", "spring"]
 	for gi in range(groups.size()):
 		var g: Array = groups[gi]
 		check(valid_sizes.has(g.size()), "wave %d matches a known archetype size" % gi)

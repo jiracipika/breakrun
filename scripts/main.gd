@@ -22,9 +22,6 @@ var life_label: Label
 var distance_label: Label
 var instruction: Label
 var result_label: Label
-var attack_button: Button
-var jump_button: Button
-var slide_button: Button
 var enemy_nodes: Dictionary = {}
 var counter_ring: MeshInstance3D
 var warning_lane: MeshInstance3D
@@ -163,10 +160,10 @@ func _build_title() -> void:
 	label(title, "Every enemy is a weapon.", Rect2(51, 197, 440, 36), 22)
 	panel(title, Rect2(28, 624, 484, 303), INK)
 	label(title, "Make your own way through.", Rect2(48, 639, 450, 35), 23)
-	label(title, "Dodge the bash. Counter the recovery.\nSend the whole checkpoint flying.", Rect2(48, 686, 450, 60), 19)
+	label(title, "Swipe anywhere to move, jump and slide.\nTap to counter the recovery.", Rect2(48, 686, 450, 60), 19)
 	button(title, "Start running", Rect2(48, 771, 444, 62), start_run, true).name = "StartButton"
 	label(title, "Early interaction build · no accounts or ads", Rect2(48, 849, 444, 28), 16)
-	label(title, "Keyboard + touch  /  Built in Godot", Rect2(48, 884, 444, 24), 15)
+	label(title, "Keyboard: WASD + Space  /  Touch: swipe + tap", Rect2(48, 884, 444, 24), 15)
 
 func _build_hud() -> void:
 	hud = Control.new()
@@ -181,12 +178,6 @@ func _build_hud() -> void:
 	panel(hud, Rect2(24, 141, 492, 72), INK)
 	instruction = label(hud, "", Rect2(40, 150, 456, 58), 20)
 	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	panel(hud, Rect2(24, 782, 492, 150), INK)
-	label(hud, "Swipe the track to move  /  tap the buttons", Rect2(40, 795, 460, 26), 17)
-	jump_button = button(hud, "Jump", Rect2(40, 843, 124, 68), dispatch_action.bind("jump"))
-	slide_button = button(hud, "Slide", Rect2(176, 843, 124, 68), dispatch_action.bind("slide"))
-	attack_button = button(hud, "Counter", Rect2(312, 833, 188, 78), dispatch_action.bind("attack"), true)
-	attack_button.name = "CounterButton"
 	hud.visible = false
 
 func _build_overlays() -> void:
@@ -269,16 +260,20 @@ func dispatch_action(action: String) -> void:
 	model.act(action)
 	_sync_ui()
 
+## A finished pointer is either a swipe direction or a tap; taps attack.
+func _dispatch_gesture(action: String) -> void:
+	dispatch_action("attack" if action == "" else action)
+
 func _input(event: InputEvent) -> void:
 	# Finish the pointer that began on the track even if release crosses UI.
 	if event is InputEventScreenTouch and not event.pressed and gestures.pointer == event.index:
 		if event.canceled:
 			gestures.cancel()
 		else:
-			dispatch_action(gestures.finish(event.index, event.position))
+			_dispatch_gesture(gestures.finish(event.index, event.position))
 		get_viewport().set_input_as_handled()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed and gestures.pointer == -2:
-		dispatch_action(gestures.finish(-2, event.position))
+		_dispatch_gesture(gestures.finish(-2, event.position))
 		get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -428,7 +423,7 @@ func _sync_ui() -> void:
 		if e.z <= 12 and e.z > 6:
 			text = "DODGE  ←  Leave the marked lane  →"
 		if e.z <= 6 and e.z >= 2 and e.dodged:
-			text = "COUNTER NOW  ·  Space / yellow button"
+			text = "COUNTER NOW  ·  tap anywhere"
 			ready_to_counter = absi(int(e.lane) - model.lane) <= 1
 		break
 	if model.feedback != "":
@@ -440,14 +435,10 @@ func _sync_ui() -> void:
 			last_sound_feedback = "clean" + str(model.score)
 			play_sound("clean")
 	instruction.text = text
-	jump_button.disabled = model.state != "running"
-	slide_button.disabled = model.state != "running"
-	attack_button.text = "Counter NOW" if ready_to_counter else "Counter"
-	attack_button.disabled = model.state != "running"
 	if ready_to_counter and not reduced_motion and model.state == "running":
-		attack_button.modulate.a = 0.72 + 0.28 * sin(model.time * 12.0)
+		instruction.modulate.a = 0.72 + 0.28 * sin(model.time * 12.0)
 	else:
-		attack_button.modulate.a = 1.0
+		instruction.modulate.a = 1.0
 
 func _sync_world(delta: float) -> void:
 	var blend: float = minf(1.0, delta * 16.0)

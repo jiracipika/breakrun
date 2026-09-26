@@ -34,7 +34,7 @@ progress { width: 100%; accent-color: #ffca45; margin-top: 20px; }
 </head>
 <body>
 <main id="frame" aria-label="BREAKRUN game">
-<canvas id="canvas" tabindex="0" aria-label="BREAKRUN. Enter to start. A and D to change lanes, W to jump, S to slide, Space to counter, Escape to pause."></canvas>
+<canvas id="canvas" tabindex="0" aria-label="BREAKRUN. Enter to start. A and D to change lanes, W to jump, S to slide, Space or tap to counter, Escape to pause."></canvas>
 <section id="loading" aria-live="polite">
 <h1>BREAKRUN</h1><p>Sunbreak Riot<br>Every enemy is a weapon.</p>
 <progress id="progress" aria-label="Downloading game"></progress>
@@ -42,10 +42,10 @@ progress { width: 100%; accent-color: #ffca45; margin-top: 20px; }
 <noscript>JavaScript and WebGL 2 are required to play.</noscript>
 </section>
 </main>
-<aside id="help">Early playable prototype<br>A / D — change lane<br>W / S — jump / slide<br>Space — counter<br>Escape — pause<br><br>Touch: swipe the track.<br>Use the yellow Counter button.</aside>
+<aside id="help">Early playable prototype<br>A / D — change lane<br>W / S — jump / slide<br>Space or click — counter<br>Escape — pause<br><br>Touch: swipe to move,<br>jump or slide — tap to counter.</aside>
 <script src="index.js"></script>
 <script>
-const config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":135016,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":134424,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const canvas = document.getElementById('canvas');
 const notice = document.getElementById('notice');
 function resizeCanvas() {

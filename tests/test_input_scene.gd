@@ -71,7 +71,14 @@ func run() -> void:
 	game.start_run()
 	touch(0, Vector2(380, 860), true)
 	touch(0, Vector2(200, 520), false)
-	check(game.model.lane == 0 and game.gestures.pointer == -1, "touch starting on Counter cannot become a swipe")
+	check(game.model.lane == 0 and game.gestures.pointer == -1, "canceled pointer never becomes an action")
+	game.start_run()
+	touch(0, Vector2(240, 500), true)
+	touch(0, Vector2(244, 504), false)
+	check(game.model.feedback_time > 0.0, "a tap anywhere fires a counter attempt")
+	touch(0, Vector2(240, 500), true)
+	touch(0, Vector2(245, 500), false)
+	check(game.model.lane == 0 and game.gestures.pointer == -1, "tiny movements never act as swipes")
 	touch(0, Vector2(220, 450), true)
 	game.pause_run()
 	game.pause_run()
@@ -94,9 +101,9 @@ func run() -> void:
 	key(KEY_D)
 	for i in range(216):
 		game._physics_process(1.0 / 60.0)
-	mouse_click(game.attack_button.get_global_rect().get_center())
-	check(game.model.counter_count == 1, "real mouse click activates Counter")
-	check(game.model.lane == 1 and game.gestures.pointer == -1, "counter click does not leak into gesture routing")
+	mouse_click(Vector2(240, 480))
+	check(game.model.counter_count == 1, "a mouse tap counters the recovering shield")
+	check(game.model.lane == 1 and game.gestures.pointer == -1, "counter tap does not leak into gesture routing")
 	game._notification(Node.NOTIFICATION_APPLICATION_FOCUS_OUT)
 	check(game.model.state == "paused", "focus loss pauses play")
 	game.return_to_title()
@@ -113,7 +120,7 @@ func run() -> void:
 	game._sync_ui()
 	key(KEY_ESCAPE)
 	check(game.model.state == "title", "Escape returns to title from the result screen")
-	# Touch ergonomics: actions land on touch-down, panels pass drags through.
+	# Touch ergonomics: panels pass drags through; menus still fire on touch-down.
 	game.start_run()
 	touch(0, Vector2(240, 180), true)
 	touch(0, Vector2(350, 180), false)
@@ -122,19 +129,15 @@ func run() -> void:
 	var press := InputEventMouseButton.new()
 	press.button_index = MOUSE_BUTTON_LEFT
 	press.pressed = true
-	press.position = game.jump_button.get_global_rect().get_center()
+	press.position = game.get_node("Interface/HUD/PauseButton").get_global_rect().get_center()
 	root.push_input(press, true)
-	game._physics_process(0.1)
-	check(game.model.height > 0.0, "jump fires on touch-down, not release")
+	check(game.model.state == "paused", "pause fires on touch-down, not release")
 	var release := InputEventMouseButton.new()
 	release.button_index = MOUSE_BUTTON_LEFT
 	release.pressed = false
 	release.position = press.position
 	root.push_input(release, true)
-	game.model.state = "paused"
-	game._sync_ui()
-	check(game.attack_button.has_theme_stylebox_override("disabled"), "counter button has a disabled style")
-	check(game.jump_button.disabled and game.slide_button.disabled, "jump and slide dim outside play")
+	game.start_run()
 	print("INPUT: %d/%d checks passed" % [checks - failures, checks])
 	game.free()
 	quit(1 if failures else 0)

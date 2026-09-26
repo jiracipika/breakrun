@@ -113,8 +113,14 @@ static func enemy(parent: Node3D, kind: String) -> Node3D:
 			box(actor, Vector3(0.25, 0.6, 0.25), Vector3(side * 0.23, 0.35, 0), COBALT)
 			box(actor, Vector3(0.27, 0.60, 0.27), Vector3(side * 0.5, 1.1, 0), TEAL)
 		if kind == "shield":
-			box(actor, Vector3(1.28, 1.4, 0.22), Vector3(0, 1.0, 0.53), TEAL)
+			# Paper-framed teal plate so the shield robot reads distinct from
+			# the cobalt-and-saffron barrier, plus a coral head beacon. The
+			# frame stays near body size: oversized plates read as slabs when
+			# the launched robot tumbles.
+			box(actor, Vector3(1.5, 1.46, 0.14), Vector3(0, 1.05, 0.54), PAPER)
+			box(actor, Vector3(1.32, 1.28, 0.2), Vector3(0, 1.05, 0.53), TEAL)
 			for i in range(3):
-				var slash := box(actor, Vector3(0.13, 0.70, 0.25), Vector3(-0.32 + i * 0.32, 1.0, 0.54), PAPER)
+				var slash := box(actor, Vector3(0.14, 0.72, 0.24), Vector3(-0.34 + i * 0.34, 1.05, 0.55), PAPER)
 				slash.rotation.z = -0.35
+			box(actor, Vector3(0.52, 0.16, 0.52), Vector3(0, 2.06, 0), CORAL)
 	return actor

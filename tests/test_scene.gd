@@ -40,6 +40,12 @@ func run() -> void:
 				game.pause_run()
 				game.dispatch_action("right")
 				check(game.model.lane == 1, "UI action reaches logical movement")
+				var legend: Control = game.get_node_or_null("Interface/HUD/Legend")
+				check(legend != null and not legend.visible, "legend hides after the first action")
+				game.start_run()
+				check(legend.visible, "gesture legend shows at run start")
+				game._physics_process(6.0)
+				check(not legend.visible, "legend hides itself after five seconds")
 				game.model.hp = 0
 				game.model.state = "dead"
 				game._physics_process(0.01)

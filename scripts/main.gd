@@ -17,6 +17,11 @@ var gestures = Gestures.new()
 var hud: Control
 var pause_overlay: Control
 var result_overlay: Control
+var legend: Panel
+var _legend_age: float = 0.0
+var _legend_done: bool = false
+var camera: Camera3D
+var burst_pieces: Array = []
 var score_label: Label
 var life_label: Label
 var distance_label: Label
@@ -68,6 +73,7 @@ func _ready() -> void:
 	camera.fov = 62
 	camera.far = 180
 	add_child(camera)
+	self.camera = camera
 	camera.look_at(Vector3(0, 1.0, -14))
 	interface = CanvasLayer.new()
 	interface.name = "Interface"
@@ -178,6 +184,12 @@ func _build_hud() -> void:
 	panel(hud, Rect2(24, 141, 492, 72), INK)
 	instruction = label(hud, "", Rect2(40, 150, 456, 58), 20)
 	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# Gesture legend in the space the old button bar vacated: the whole screen
+	# is the controller now, and this teaches it until the player acts.
+	legend = panel(hud, Rect2(110, 630, 320, 104), Color(INK, 0.82))
+	legend.name = "Legend"
+	label(legend, "Swipe  ← →  move   ·   ↑ jump   ·   ↓ slide", Rect2(20, 18, 280, 30), 16)
+	label(legend, "Tap  —  counter", Rect2(20, 54, 280, 32), 20, GOLD)
 	hud.visible = false
 
 func _build_overlays() -> void:
@@ -231,6 +243,12 @@ func start_run() -> void:
 	previous_counters = 0
 	previous_hp = 3
 	kick_timer = 0.0
+	_legend_age = 0.0
+	_legend_done = false
+	legend.visible = true
+	for burst in burst_pieces:
+		burst["node"].free()
+	burst_pieces.clear()
 	for node in enemy_nodes.values():
 		node.free()
 	enemy_nodes.clear()
@@ -258,6 +276,8 @@ func return_to_title() -> void:
 
 func dispatch_action(action: String) -> void:
 	model.act(action)
+	_legend_done = true
+	legend.visible = false
 	_sync_ui()
 
 ## A finished pointer is either a swipe direction or a tap; taps attack.
@@ -379,6 +399,10 @@ func _physics_process(delta: float) -> void:
 		hit_flash.modulate.a = minf(1.0, hit_flash_time / 0.22)
 	else:
 		hit_flash.visible = false
+	if model.state == "running" and legend.visible and not _legend_done:
+		_legend_age += delta
+		if _legend_age >= 5.0:
+			legend.visible = false
 	_sync_ui()
 	# Read-only observability for local debugging; kept out of release exports.
 	if OS.has_feature("web") and OS.is_debug_build():
@@ -400,6 +424,30 @@ func _failure_line() -> String:
 			return "A hurdle tripped you — jump or slide."
 		_:
 			return "Dodge first. Counter the open ring."
+
+## Opaque impact shards flung from the counter lane (art bible: cards, not clouds).
+func _spawn_burst() -> void:
+	var origin := Vector3(model.last_counter_lane * 2.5, 0.9, -1.2)
+	for i in range(6):
+		var piece := Art.box(world, Vector3(0.24, 0.08, 0.02), origin, PAPER if i % 2 == 0 else Art.SAFFRON)
+		var angle := TAU * float(i) / 6.0
+		burst_pieces.append({"node": piece,
+			"velocity": Vector3(cos(angle) * 3.4, sin(angle) * 2.2 + 1.4, -0.8),
+			"spin": randf_range(-7.0, 7.0), "age": 0.0})
+
+func _update_bursts(delta: float) -> void:
+	var surviving: Array = []
+	for burst in burst_pieces:
+		burst["age"] += delta
+		if burst["age"] < 0.38:
+			var node: MeshInstance3D = burst["node"]
+			node.position += burst["velocity"] * delta
+			burst["velocity"] = burst["velocity"] + Vector3(0.0, -9.0 * delta, 0.0)
+			node.rotation.z += burst["spin"] * delta
+			surviving.append(burst)
+		else:
+			burst["node"].free()
+	burst_pieces = surviving
 
 func _sync_ui() -> void:
 	title.visible = model.state == "title"
@@ -457,12 +505,17 @@ func _sync_world(delta: float) -> void:
 	if model.counter_count > previous_counters:
 		kick_timer = 0.32
 		previous_counters = model.counter_count
+		if not reduced_motion:
+			_spawn_burst()
 	kick_timer = maxf(0.0, kick_timer - delta)
 	if kick_timer > 0 and not reduced_motion:
 		runner.get_node("LegR").rotation.x = -1.6
 		runner.rotation.z = 0.23 * (model.lane - model.last_counter_lane)
+		camera.fov = 62.0 + 6.0 * (kick_timer / 0.32)
 	else:
 		runner.rotation.z = 0.0
+		camera.fov = 62.0
+	_update_bursts(delta)
 	var index: int = 0
 	for tile in world.get_node("Tiles").get_children():
 		tile.position.z = 9.0 - fposmod(index * 8.0 - model.distance, 144.0)
@@ -485,6 +538,8 @@ func _sync_world(delta: float) -> void:
 		if enemy.phase == "launched":
 			actor.rotation.x += model.time * 9.0  # tumbling spin while flying
 			actor.position.y = 0.35
+			# Cartwheel away small: a full-size flat plate reads as a slab.
+			actor.scale = Vector3(0.62, 0.62, 0.62)
 		elif enemy.phase == "approach" and enemy.kind == "dummy":
 			# Idle sway so stacked dummies don't merge into one clump.
 			actor.rotation.z = 0.05 * sin(model.time * 3.0 + float(enemy.id))
@@ -497,10 +552,13 @@ func _sync_world(delta: float) -> void:
 		elif enemy.phase == "bash":
 			# Forward lunge wind-up: rocks toward the player as it attacks.
 			actor.rotation.x = -0.20 - 0.16 * sin(model.time * 18.0)
+			actor.position.z += 0.5 + 0.35 * sin(model.time * 18.0)
 		elif enemy.phase == "recovery":
 			# Exposed lean-back invites the counter.
 			actor.rotation.x = 0.26
-		if enemy.kind == "shield" and enemy.z <= 12 and enemy.z > 6:
+		# Warn only for an approaching shield: a launched one re-enters this
+		# z band flying away and must not resurrect the dodge warning.
+		if enemy.kind == "shield" and enemy.phase == "approach" and enemy.z <= 12 and enemy.z > 6:
 			warning_lane.visible = true
 			warning_lane.position = Vector3(enemy.lane * 2.5, -0.04, -3.0)
 		if enemy.kind == "shield" and enemy.phase == "recovery" and enemy.z >= 2:

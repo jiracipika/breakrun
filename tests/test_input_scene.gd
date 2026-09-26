@@ -90,6 +90,11 @@ func run() -> void:
 		game._physics_process(1.0 / 60.0)
 	key(KEY_SPACE)
 	check(game.model.counter_count == 1, "keyboard dodge and counter work in integrated scene")
+	game._physics_process(1.0 / 60.0)
+	check(game.camera.fov > 62.0, "counter kicks the camera fov")
+	for i in range(40):
+		game._physics_process(1.0 / 60.0)
+	check(absf(game.camera.fov - 62.0) < 0.01, "camera fov settles back after the counter kick")
 	for i in range(60):
 		game._physics_process(1.0 / 60.0)
 	check(game.model.chain_count == 1 and game.model.score == 587, "projectile clears checkpoint through integrated scene")

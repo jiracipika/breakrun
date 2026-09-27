@@ -18,6 +18,15 @@ const SPRING_SWEEP_Z: float = 9.0
 const SPRING_RECOVERY_Z: float = 6.0
 const BOOST_TIME: float = 1.2
 const BOOST_MULT: float = 0.35
+const INSPECTOR_DISTANCE: float = 490.0
+const INSPECTOR_HOLD_Z: float = 14.0
+const INSPECTOR_TELEGRAPH: float = 0.9
+const INSPECTOR_ACTIVE: float = 0.7
+const INSPECTOR_RECOVERY: float = 1.0
+const INSPECTOR_HP: int = 3
+const INSPECTOR_BREAK_SCORE: int = 150
+const INSPECTOR_CLEAR_SCORE: int = 300
+const INSPECTOR_PATTERNS: Array = ["bash", "sweep", "scanner"]
 const STAGGER_TIME: float = 1.0
 const STAGGER_SLOWDOWN: float = 0.8
 const INPUT_BUFFER: float = 0.25
@@ -48,6 +57,9 @@ var run_seed: int = 42
 var last_hit_kind: String = ""
 var best_combo: int = 0
 var boost_count: int = 0
+var inspector: Dictionary = {}
+var inspector_hits: int = 0
+var inspectors_defeated: int = 0
 var _stagger: float = 0.0
 var _boost: float = 0.0
 var _buffered_action: String = ""
@@ -81,6 +93,9 @@ func start(seed_value: int = 42) -> void:
 	last_hit_kind = ""
 	best_combo = 0
 	boost_count = 0
+	inspector = {}
+	inspector_hits = 0
+	inspectors_defeated = 0
 	_stagger = 0.0
 	_boost = 0.0
 	_buffered_action = ""
@@ -287,9 +302,64 @@ func _tick(dt: float) -> void:
 	# No mutation of array structure during iteration.
 	enemies = enemies.filter(func(e: Dictionary) -> bool:
 		return e.z >= -5.0 and (e.phase != "launched" or e.age < 1.5))
+	_tick_inspector(dt)
 	if distance >= _next_wave_distance and state == "running":
 		_spawn_wave(SPAWN_DISTANCE - (distance - _next_wave_distance))
 		_next_wave_distance += WAVE_SPACING
+	if inspector.is_empty() and distance >= INSPECTOR_DISTANCE * float(inspectors_defeated + 1):
+		inspector = {"lane": 0, "pattern": INSPECTOR_PATTERNS[_rng.randi_range(0, 2)],
+			"phase": "telegraph", "pattern_time": 0.0, "hits": 0, "dodged": false}
+
+## The checkpoint machine: telegraph a taught pattern, punish failure at the
+## active step, open the counter window, roll the next pattern.
+func _tick_inspector(dt: float) -> void:
+	if inspector.is_empty():
+		return
+	inspector.pattern_time += dt
+	var pattern: String = inspector.pattern
+	if inspector.phase == "telegraph" and inspector.pattern_time >= INSPECTOR_TELEGRAPH:
+		inspector.phase = "active"
+		inspector.pattern_time = 0.0
+		inspector.dodged = false
+		var in_lane: bool = inspector.lane == lane
+		match pattern:
+			"bash":
+				inspector.dodged = not in_lane
+			"sweep":
+				inspector.dodged = not in_lane or sliding
+			"scanner":
+				inspector.dodged = not in_lane or height > 0.5
+		if not inspector.dodged:
+			_damage("inspector")
+	elif inspector.phase == "active" and inspector.pattern_time >= INSPECTOR_ACTIVE:
+		inspector.phase = "recovery"
+		inspector.pattern_time = 0.0
+	elif inspector.phase == "recovery" and inspector.pattern_time >= INSPECTOR_RECOVERY:
+		_next_inspector_pattern()
+
+func _next_inspector_pattern() -> void:
+	inspector.phase = "telegraph"
+	inspector.pattern_time = 0.0
+	inspector.dodged = false
+	var next: int = _rng.randi_range(0, 2)
+	if INSPECTOR_PATTERNS[next] == inspector.pattern:
+		next = (next + 1) % 3  # never repeat the same pattern twice in a row
+	inspector.pattern = INSPECTOR_PATTERNS[next]
+	var shift: int = _rng.randi_range(-1, 1)
+	inspector.lane = clampi(int(inspector.lane) + shift, -1, 1)
+
+func _break_inspector() -> void:
+	inspector.hits += 1
+	inspector_hits += 1
+	score += INSPECTOR_BREAK_SCORE
+	if inspector.hits >= INSPECTOR_HP:
+		score += INSPECTOR_CLEAR_SCORE
+		inspectors_defeated += 1
+		_message("ROUTE CLEARED!", 1.6)
+		inspector = {}
+	else:
+		_message("Pattern broken!  %d / %d" % [inspector.hits, INSPECTOR_HP], 1.2)
+		_next_inspector_pattern()
 
 func _spawn_wave(z: float) -> void:
 	# The first two waves teach the checkpoint chain; later waves draw an
@@ -339,6 +409,13 @@ func _try_counter() -> void:
 		if strikeable:
 			if nearest.is_empty() or e.z < nearest.z:
 				nearest = e
+	# The checkpoint machine takes priority while its counter window is open.
+	if not inspector.is_empty() and inspector.phase == "recovery":
+		if not inspector.dodged:
+			_message("Break its pattern first!", 0.8)
+		else:
+			_break_inspector()
+			return
 	if nearest.is_empty():
 		_message("Watch for the next shield.", 0.8)
 	elif nearest.z > COUNTER_MAX_Z:

@@ -28,11 +28,13 @@ var distance_label: Label
 var instruction: Label
 var result_label: Label
 var enemy_nodes: Dictionary = {}
+var inspector_node: Node3D
 var counter_ring: MeshInstance3D
 var warning_lane: MeshInstance3D
 var kick_timer: float = 0.0
 var previous_counters: int = 0
 var previous_boosts: int = 0
+var previous_inspectors: int = 0
 var reduced_motion: bool = false
 var _web_status_elapsed: float = 0.0
 var hit_flash: ColorRect
@@ -243,6 +245,7 @@ func start_run() -> void:
 	model.start(fixed_seed if fixed_seed != 0 else _fresh_seed())
 	previous_counters = 0
 	previous_boosts = 0
+	previous_inspectors = 0
 	previous_hp = 3
 	kick_timer = 0.0
 	_legend_age = 0.0
@@ -395,6 +398,11 @@ func _physics_process(delta: float) -> void:
 	if model.boost_count > previous_boosts:
 		previous_boosts = model.boost_count
 		play_sound("boost")
+	if model.inspectors_defeated > previous_inspectors:
+		previous_inspectors = model.inspectors_defeated
+		play_sound("chain")
+		if not reduced_motion:
+			_spawn_burst()
 	if model.hp < previous_hp:
 		previous_hp = model.hp
 		hit_flash_time = 0.22
@@ -424,6 +432,8 @@ func _failure_line() -> String:
 	match model.last_hit_kind:
 		"shield":
 			return "Shield bash caught you — counter it."
+		"inspector":
+			return "Its pattern caught you — dodge it."
 		"kicker":
 			return "A stamp sweep caught you — slide under it."
 		"spring":
@@ -477,28 +487,48 @@ func _sync_ui() -> void:
 	result_label.text = "%d points · %d metres%s\nCounters %d · Chains %d · best ×%.2f\nBest: %d · Seed %d\n%s" % [model.score, int(model.distance), best_mark, model.counter_count, model.chain_count, model.style_multiplier(), best_score, model.run_seed, _failure_line()]
 	var text: String = "Move out of the shield's lane when it winds up."
 	var ready_to_counter: bool = false
-	for e in model.enemies:
-		if (e.kind != "shield" and e.kind != "kicker" and e.kind != "spring") or e.phase == "launched" or e.phase == "cleared":
-			continue
-		if e.kind == "kicker":
-			if e.z <= 16 and e.z > 9:
-				text = "SWEEP!  Slide the striped lane"
-			if e.z <= 6 and e.z >= 2 and e.dodged:
-				text = "STRIKE NOW  ·  tap anywhere"
-				ready_to_counter = absi(int(e.lane) - model.lane) <= 1
-		elif e.kind == "spring":
-			if e.z <= 16 and e.z > 9:
-				text = "JUMP  —  its sweep is low"
-			if e.z <= 6 and e.z >= 2 and e.dodged:
-				text = "STRIKE NOW  ·  tap anywhere"
-				ready_to_counter = absi(int(e.lane) - model.lane) <= 1
-		else:
-			if e.z <= 12 and e.z > 6:
-				text = "DODGE  —  leave the marked lane"
-			if e.z <= 6 and e.z >= 2 and e.dodged:
-				text = "COUNTER NOW  ·  tap anywhere"
-				ready_to_counter = absi(int(e.lane) - model.lane) <= 1
-		break
+	if not model.inspector.is_empty():
+		# The checkpoint machine owns the lecture until it is beaten.
+		match model.inspector.phase:
+			"telegraph":
+				match model.inspector.pattern:
+					"bash":
+						text = "CHANGE LANE — its bash is winding up"
+					"sweep":
+						text = "SLIDE — its bar sweeps high"
+					"scanner":
+						text = "JUMP — its bar sweeps low"
+			"active":
+				text = "NOW!"
+			"recovery":
+				if model.inspector.dodged:
+					text = "BREAK IT  ·  tap anywhere  (%d/%d)" % [model.inspector.hits, Model.INSPECTOR_HP]
+					ready_to_counter = true
+				else:
+					text = "MISSED — recover and wait"
+	else:
+		for e in model.enemies:
+			if (e.kind != "shield" and e.kind != "kicker" and e.kind != "spring") or e.phase == "launched" or e.phase == "cleared":
+				continue
+			if e.kind == "kicker":
+				if e.z <= 16 and e.z > 9:
+					text = "SWEEP!  Slide the striped lane"
+				if e.z <= 6 and e.z >= 2 and e.dodged:
+					text = "STRIKE NOW  ·  tap anywhere"
+					ready_to_counter = absi(int(e.lane) - model.lane) <= 1
+			elif e.kind == "spring":
+				if e.z <= 16 and e.z > 9:
+					text = "JUMP  —  its sweep is low"
+				if e.z <= 6 and e.z >= 2 and e.dodged:
+					text = "STRIKE NOW  ·  tap anywhere"
+					ready_to_counter = absi(int(e.lane) - model.lane) <= 1
+			else:
+				if e.z <= 12 and e.z > 6:
+					text = "DODGE  —  leave the marked lane"
+				if e.z <= 6 and e.z >= 2 and e.dodged:
+					text = "COUNTER NOW  ·  tap anywhere"
+					ready_to_counter = absi(int(e.lane) - model.lane) <= 1
+			break
 	if model.feedback != "":
 		text = model.feedback
 		if text.begins_with("Chain") and last_sound_feedback != text + str(model.chain_count):
@@ -613,3 +643,48 @@ func _sync_world(delta: float) -> void:
 		if not live_ids.has(id):
 			enemy_nodes[id].free()
 			enemy_nodes.erase(id)
+	if model.inspector.is_empty():
+		if inspector_node != null:
+			inspector_node.free()
+			inspector_node = null
+	else:
+		if inspector_node == null:
+			inspector_node = Art.inspector(world)
+		var inspect: Dictionary = model.inspector
+		inspector_node.position = Vector3(lerpf(inspector_node.position.x, inspect.lane * 2.5, blend), 0.0, -14.0)
+		inspector_node.rotation = Vector3.ZERO
+		inspector_node.scale = Vector3.ONE
+		var bar: Node3D = inspector_node.get_node_or_null("Bar")
+		var beacon: Node3D = inspector_node.get_node_or_null("Beacon")
+		if bar != null:
+			bar.rotation = Vector3.ZERO
+			bar.scale = Vector3.ONE
+		if beacon != null:
+			beacon.scale = Vector3.ONE
+		if inspect.phase == "telegraph":
+			# Slow lean forward; the beacon pulses to announce the machine.
+			inspector_node.rotation.x = -0.12
+			if beacon != null and not reduced_motion:
+				var pulse: float = 1.0 + 0.2 * sin(model.time * 8.0)
+				beacon.scale = Vector3(pulse, pulse, pulse)
+		elif inspect.phase == "active":
+			match inspect.pattern:
+				"bash":
+					# Chassis lunge toward the player, like the shield bash.
+					inspector_node.rotation.x = -0.3
+					inspector_node.position.z += 0.5 + 0.35 * sin(model.time * 18.0)
+				"sweep":
+					if bar != null:
+						bar.rotation.x = -1.4
+				"scanner":
+					if bar != null:
+						bar.rotation.x = 1.2
+						bar.scale.y = 0.6
+		else:
+			# Leans back with the bar parked: the counter window is open.
+			inspector_node.rotation.x = 0.22
+		# The bash marks its lane from wind-up through the strike. This runs
+		# after the shield warning above, so the inspector's lane wins the mesh.
+		if inspect.pattern == "bash" and (inspect.phase == "telegraph" or inspect.phase == "active"):
+			warning_lane.visible = true
+			warning_lane.position = Vector3(inspect.lane * 2.5, -0.04, -12.0)

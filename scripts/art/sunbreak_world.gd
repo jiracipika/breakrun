@@ -150,3 +150,24 @@ static func enemy(parent: Node3D, kind: String) -> Node3D:
 				slash.rotation.z = -0.35
 			box(actor, Vector3(0.52, 0.16, 0.52), Vector3(0, 2.06, 0), CORAL)
 	return actor
+
+static func inspector(parent: Node3D) -> Node3D:
+	# The Route Inspector: a wide checkpoint machine ending the teaching loop.
+	# Cobalt bulk, teal wheels and saffron stripes set it apart from the bipedal
+	# robots as the run's final opponent; the paper bar boom swings up for the
+	# sweep pattern and flat-low for the scanner.
+	var actor := Node3D.new()
+	actor.name = "Inspector"
+	parent.add_child(actor)
+	box(actor, Vector3(2.6, 1.5, 1.4), Vector3(0, 1.0, 0), COBALT)
+	for i in range(3):
+		box(actor, Vector3(0.6, 0.48, 0.44), Vector3(-0.88 + i * 0.88, 0.24, 0.5), TEAL)
+	box(actor, Vector3(2.64, 0.2, 0.06), Vector3(0, 1.28, 0.71), SAFFRON)
+	box(actor, Vector3(2.64, 0.1, 0.06), Vector3(0, 0.72, 0.71), SAFFRON)
+	limb(actor, "Beacon", Vector3(0, 2.15, 0), Vector3(0.5, 0.5, 0.5), CORAL)
+	var bar := Node3D.new()
+	bar.name = "Bar"
+	bar.position = Vector3(0, 1.0, 0.7)
+	actor.add_child(bar)
+	box(bar, Vector3(2.4, 0.16, 0.16), Vector3(0, 0, 0.8), PAPER)
+	return actor

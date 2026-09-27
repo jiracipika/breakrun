@@ -119,6 +119,15 @@ Post-fix capture QC: no gate remains, obstacles read as separate depth-separated
 - Full `verify.py --render` pass: 13/13 suites, 273 assertions. Chain reference 587, LIVE and LIVE-STAGGER markers unchanged; spring capture verified visually.
 - Not proven: real-device feel; jump-window timing in human hands (playtest gate).
 
+## Route Inspector slice (010)
+
+- `test_inspector.gd` (20 assertions): spawns once at the 490 m checkpoint and is never culled; bash punishes staying in the marked lane (naming the inspector) and still cycles into recovery after a hit; leaving the lane dodges; sweep dodges via slide but not jump; scanner dodges via jump but not slide; a counter during recovery after a dodge breaks the pattern (+150); three breaks defeat it (+300 clear, 750 per full fight, defeat recorded); a defeated machine chain-clears no wave targets; the same seed replays the same pattern/lane sequence and different seeds differ. No-repeat rule: a pattern never repeats twice in a row.
+- Test-harness lessons recorded: the 490 m trip face-tanks waves down to ~83/99 hp, so staged patterns restore a known pip count; tick drift rounds against exact boundaries, so advances are lead + 0.05; the jump dodge needs ~0.25 s of arc, so scanner stagings lead by 0.3.
+- Integration fix owned by the model change: the regression soak's dodge AI now reads the inspector's bash telegraph (it is not a wave member) — without this the stagger slowdown shifted the run's endpoint and the spawn-window assertion failed by phase luck.
+- Delegated subagents built the presentation (wheeled cobalt machine with coral beacon, saffron stripes and a paper bar pivot; bash lunge / high bar / low bar poses; bash warning lane; per-pattern font-safe instruction copy with break progress; defeat burst + sound; staged capture) and the README/NEXT updates; their reports flagged the soak failure and a stale backlog line, both fixed above.
+- Full `verify.py --render` pass: 14/14 suites, 293 assertions. Chain reference 587, LIVE and LIVE-STAGGER unchanged; inspector capture verified visually.
+- Not proven: real-device feel; boss fight tuning (telegraph windows, pattern frequency, clear reward) awaits the human playtest gate.
+
 ## Review and publication status
 
 Independent spec-review attempt via delegate_task was blocked by GLM HTTP 429 (billing/credits exhausted). It did not review code. A read-only fallback through the installed Codex CLI failed with HTTP 401 because its refresh token had already been used; no authentication configuration was changed. Neither attempt supplies an independent approval.

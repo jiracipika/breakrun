@@ -79,6 +79,11 @@ func _init() -> void:
 		for e in model.enemies:
 			if e.z < 14.0 and e.z > 0.0 and e.phase != "cleared":
 				occupied[int(e.lane)] = true
+		# The inspector is not a wave member: the soak AI must read its
+		# telegraph like a player would or eat every bash.
+		if not model.inspector.is_empty() and model.inspector.pattern == "bash" \
+				and model.inspector.phase in ["telegraph", "active"]:
+			occupied[int(model.inspector.lane)] = true
 		if occupied.has(model.lane):
 			var candidate: int = model.lane
 			for offset in [1, -1, 2, -2]:

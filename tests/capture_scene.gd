@@ -74,6 +74,13 @@ func _process(_delta: float) -> bool:
 			1 if (crashed != null and crashed.phase == "cleared") else 0,
 			1 if game.model.stagger_ratio() > 0.0 else 0])
 		capture("stagger")
+	if frames == 300:
+		# Stage the Route Inspector mid-telegraph in the runner's lane; capture
+		# before the spring stages so the boss reads alone in frame.
+		game.model.inspector = {"lane": game.model.lane, "pattern": "bash", "phase": "telegraph",
+			"pattern_time": 0.0, "hits": 0, "dodged": false}
+	if frames == 305:
+		capture("inspector")
 	if frames == 310:
 		# Stage the spring in its telegraph band; capture before the kicker stages.
 		game.model.enemies.append({"id": 997, "kind": "spring", "lane": game.model.lane,

@@ -38,6 +38,10 @@ func _process(_delta: float) -> bool:
 		game.get_node("Interface/Title/StartButton").pressed.emit()
 	if frames > 30 and frames < 323:
 		game._physics_process(1.0 / 60.0)
+		# A window-focus steal mid-run would otherwise poison the rest of the
+		# choreography; the deliberate pause test at frame 326 stays meaningful.
+		if game.model.state == "paused":
+			game.pause_run()
 	if frames == 60:
 		# Legend is up before the first scripted input hides it at frame 80.
 		capture("legend")

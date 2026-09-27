@@ -144,6 +144,14 @@ Post-fix capture QC: no gate remains, obstacles read as separate depth-separated
 - Full `verify.py --render` pass: 14/14 suites. LIVE and LIVE-STAGGER markers unchanged; result-screen capture reviewed after the layout fix.
 - Not proven: real clipboard contents on desktop/web; readability of the wind-up and kick reach (playtest gate).
 
+## Pooling and splash slice (013)
+
+- `test_pool.gd` (4 assertions): driving the real scene for two 60-second legs with a restart between them keeps enemy node-tree creation bounded (growth of 3 after warm-up; ~30+ before pooling), the live id mapping stays ≤ 12, live-plus-pooled nodes stay ≤ 24, and the run survives. Culled enemies now hide into a kind-keyed pool; spawns take a pooled node first; restarts release to the pool and clear the id map so a previous run's ids can never adopt a mismatched kind; reused pivots (kicker foot, courier sweep leg, stripe) reset on acquire so a node never carries its last life's pose.
+- Boot splash set to plain ink with no image — the engine logo no longer flashes between the web loading screen and the title.
+- Capture-flake hardening: one render capture failed because macOS stole window focus mid-choreography, firing the game's legitimate focus-loss pause; the capture now auto-resumes an unexpected pause before the deliberate pause assertion at frame 326 (rerun green, then full suite green).
+- Full `verify.py --render` pass: 15/15 suites. All gameplay references unchanged.
+- Not proven: real-device frame-time gains from pooling (phone gate); the splash change is visual-only.
+
 ## Review and publication status
 
 Independent spec-review attempt via delegate_task was blocked by GLM HTTP 429 (billing/credits exhausted). It did not review code. A read-only fallback through the installed Codex CLI failed with HTTP 401 because its refresh token had already been used; no authentication configuration was changed. Neither attempt supplies an independent approval.

@@ -31,6 +31,8 @@ var distance_label: Label
 var instruction: Label
 var result_label: Label
 var enemy_nodes: Dictionary = {}
+var enemy_kinds: Dictionary = {}
+var enemy_pool: Dictionary = {}
 var inspector_node: Node3D
 var counter_ring: MeshInstance3D
 var warning_lane: MeshInstance3D
@@ -301,13 +303,24 @@ func start_run() -> void:
 	for burst in burst_pieces:
 		burst["node"].free()
 	burst_pieces.clear()
-	for node in enemy_nodes.values():
-		node.free()
-	enemy_nodes.clear()
+	_release_all_enemy_nodes()
 	runner.position = Vector3.ZERO
 	runner.rotation = Vector3.ZERO
 	_sync_ui()
 	_sync_world(0.0)
+
+## Retire an enemy node into the kind-keyed pool instead of freeing it.
+func _release_enemy_node(kind: String, node: Node3D) -> void:
+	node.visible = false
+	if not enemy_pool.has(kind):
+		enemy_pool[kind] = []
+	enemy_pool[kind].append(node)
+
+func _release_all_enemy_nodes() -> void:
+	for id in enemy_nodes.keys():
+		_release_enemy_node(enemy_kinds[id], enemy_nodes[id])
+	enemy_nodes.clear()
+	enemy_kinds.clear()
 
 func pause_run() -> void:
 	gestures.cancel()
@@ -317,9 +330,7 @@ func pause_run() -> void:
 func return_to_title() -> void:
 	gestures.cancel()
 	model = Model.new()
-	for node in enemy_nodes.values():
-		node.free()
-	enemy_nodes.clear()
+	_release_all_enemy_nodes()
 	runner.position = Vector3.ZERO
 	runner.rotation = Vector3.ZERO
 	runner.scale = Vector3.ONE
@@ -639,7 +650,24 @@ func _sync_world(delta: float) -> void:
 	for enemy in model.enemies:
 		live_ids[enemy.id] = true
 		if not enemy_nodes.has(enemy.id):
-			enemy_nodes[enemy.id] = Art.enemy(world, enemy.kind)
+			var node: Node3D = null
+			var pool: Array = enemy_pool.get(enemy.kind, [])
+			if pool.size() > 0:
+				node = pool.pop_back()
+				node.visible = true
+				# A reused node keeps its last life's telegraph poses.
+				for pivot_name in ["Foot", "SweepLeg"]:
+					var pivot: Node3D = node.get_node_or_null(pivot_name)
+					if pivot != null:
+						pivot.rotation = Vector3.ZERO
+				var stripe: Node3D = node.get_node_or_null("Stripe")
+				if stripe != null:
+					stripe.visible = false
+			else:
+				node = Art.enemy(world, enemy.kind)
+			node.set_meta("kind", enemy.kind)
+			enemy_nodes[enemy.id] = node
+			enemy_kinds[enemy.id] = enemy.kind
 		var actor: Node3D = enemy_nodes[enemy.id]
 		actor.position = Vector3(enemy.lane * 2.5, 0, -enemy.z)
 		actor.rotation = Vector3.ZERO
@@ -696,8 +724,9 @@ func _sync_world(delta: float) -> void:
 			counter_ring.position = Vector3(enemy.lane * 2.5, 0.06, -enemy.z)
 	for id in enemy_nodes.keys():
 		if not live_ids.has(id):
-			enemy_nodes[id].free()
+			_release_enemy_node(enemy_kinds[id], enemy_nodes[id])
 			enemy_nodes.erase(id)
+			enemy_kinds.erase(id)
 	if model.inspector.is_empty():
 		if inspector_node != null:
 			inspector_node.free()

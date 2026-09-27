@@ -25,6 +25,9 @@ var burst_pieces: Array = []
 var score_label: Label
 var life_label: Label
 var distance_label: Label
+var best_score_label: Label
+var motion_toggle: CheckButton
+var sound_toggle: CheckButton
 var instruction: Label
 var result_label: Label
 var enemy_nodes: Dictionary = {}
@@ -112,8 +115,15 @@ func panel(parent: Node, rect: Rect2, color: Color = PANEL) -> Panel:
 	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := StyleBoxFlat.new()
 	style.bg_color = color
-	style.corner_radius_top_left = 5
-	style.corner_radius_bottom_right = 18
+	style.corner_radius_top_left = 14
+	style.corner_radius_top_right = 14
+	style.corner_radius_bottom_left = 14
+	style.corner_radius_bottom_right = 5
+	style.border_color = Color("39394f")
+	style.set_border_width_all(1)
+	style.shadow_color = Color(0.0, 0.0, 0.0, 0.24)
+	style.shadow_size = 8
+	style.shadow_offset = Vector2(0, 5)
 	node.add_theme_stylebox_override("panel", style)
 	parent.add_child(node)
 	return node
@@ -138,7 +148,10 @@ func button(parent: Node, text: String, rect: Rect2, action: Callable, primary: 
 	node.size = rect.size
 	# Runner inputs land on touch-down; release-only buttons feel laggy.
 	node.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
-	node.add_theme_font_size_override("font_size", 21)
+	node.add_theme_font_size_override("font_size", 22)
+	node.add_theme_constant_override("outline_size", 1)
+	node.focus_mode = Control.FOCUS_ALL
+	node.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	node.add_theme_color_override("font_color", INK if primary else PAPER)
 	node.add_theme_color_override("font_disabled_color", Color(PAPER, 0.45))
 	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
@@ -148,11 +161,16 @@ func button(parent: Node, text: String, rect: Rect2, action: Callable, primary: 
 			style.bg_color = PAPER if primary else PANEL.lightened(0.28)
 		elif state == "disabled":
 			style.bg_color = Color("16161f")
+		elif state == "hover" or state == "focus":
+			style.bg_color = GOLD.lightened(0.08) if primary else PANEL.lightened(0.20)
 		else:
 			style.bg_color = GOLD if primary else PANEL
-		style.border_color = PAPER
-		style.set_border_width_all(2 if state in ["focus", "hover", "pressed"] else 0)
-		style.set_corner_radius_all(5)
+		style.border_color = PAPER if state in ["focus", "hover", "pressed"] else Color("39394f")
+		style.set_border_width_all(2 if state in ["focus", "hover", "pressed"] else 1)
+		style.corner_radius_top_left = 12
+		style.corner_radius_top_right = 12
+		style.corner_radius_bottom_left = 12
+		style.corner_radius_bottom_right = 4
 		node.add_theme_stylebox_override(state, style)
 	if action.is_valid():
 		node.pressed.connect(action)
@@ -164,46 +182,58 @@ func _build_title() -> void:
 	title.name = "Title"
 	interface.add_child(title)
 	panel(title, Rect2(28, 40, 484, 222), INK)
-	label(title, "BREAKRUN", Rect2(48, 54, 450, 94), 92, GOLD)
-	label(title, "SUNBREAK RIOT", Rect2(51, 148, 440, 35), 23)
-	label(title, "Every enemy is a weapon.", Rect2(51, 197, 440, 36), 22)
+	label(title, "CITY COURIER DIVISION  /  001", Rect2(52, 54, 430, 22), 15, GOLD)
+	label(title, "BREAKRUN", Rect2(45, 75, 450, 93), 98, GOLD)
+	label(title, "SUNBREAK RIOT", Rect2(52, 174, 420, 30), 22)
+	label(title, "DODGE.  COUNTER.  CHAIN.", Rect2(52, 212, 430, 28), 19)
 	panel(title, Rect2(28, 624, 484, 303), INK)
-	label(title, "Make your own way through.", Rect2(48, 639, 450, 35), 23)
-	label(title, "Swipe anywhere to move, jump and slide.\nTap to counter the recovery.", Rect2(48, 686, 450, 60), 19)
-	button(title, "Start running", Rect2(48, 771, 444, 62), start_run, true).name = "StartButton"
-	label(title, "Early interaction build · no accounts or ads", Rect2(48, 849, 444, 28), 16)
-	label(title, "Keyboard: WASD + Space  /  Touch: swipe + tap", Rect2(48, 884, 444, 24), 15)
+	label(title, "ROOFTOP RUN  /  ENDLESS", Rect2(50, 642, 430, 22), 15, GOLD)
+	label(title, "Every enemy is a weapon.", Rect2(50, 672, 440, 40), 29)
+	label(title, "Swipe to move, jump or slide.\\nTap during recovery to counter.", Rect2(50, 719, 430, 52), 19)
+	button(title, "START RUN   →", Rect2(48, 786, 444, 62), start_run, true).name = "StartButton"
+	best_score_label = label(title, "BEST  %04d" % best_score, Rect2(50, 860, 160, 22), 16, GOLD)
+	label(title, "WASD / arrows + Space   ·   Touch: swipe + tap", Rect2(50, 890, 440, 20), 14)
 
 func _build_hud() -> void:
 	hud = Control.new()
 	hud.name = "HUD"
 	interface.add_child(hud)
-	panel(hud, Rect2(24, 26, 492, 98), INK)
-	life_label = label(hud, "", Rect2(42, 40, 124, 36), 24, GOLD)
-	label(hud, "Integrity", Rect2(42, 85, 124, 25), 16)
-	score_label = label(hud, "0", Rect2(181, 34, 170, 50), 43)
-	distance_label = label(hud, "", Rect2(181, 85, 170, 26), 17)
-	button(hud, "Pause", Rect2(395, 46, 100, 56), pause_run).name = "PauseButton"
+	panel(hud, Rect2(24, 26, 492, 100), INK)
+	label(hud, "INTEGRITY", Rect2(42, 37, 120, 20), 14, GOLD)
+	life_label = label(hud, "", Rect2(42, 60, 124, 32), 25, PAPER)
+	label(hud, "SCORE", Rect2(180, 37, 175, 20), 14, GOLD)
+	score_label = label(hud, "0", Rect2(180, 54, 175, 48), 42)
+	distance_label = label(hud, "", Rect2(180, 100, 175, 20), 14)
+	button(hud, "PAUSE", Rect2(405, 47, 88, 56), pause_run).name = "PauseButton"
 	panel(hud, Rect2(24, 141, 492, 72), INK)
-	instruction = label(hud, "", Rect2(40, 150, 456, 58), 20)
+	var signal_accent := ColorRect.new()
+	signal_accent.position = Vector2(24, 151)
+	signal_accent.size = Vector2(5, 54)
+	signal_accent.color = GOLD
+	signal_accent.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud.add_child(signal_accent)
+	instruction = label(hud, "", Rect2(46, 151, 450, 54), 20)
 	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	# Gesture legend in the space the old button bar vacated: the whole screen
 	# is the controller now, and this teaches it until the player acts.
-	legend = panel(hud, Rect2(110, 630, 320, 104), Color(INK, 0.82))
+	legend = panel(hud, Rect2(102, 630, 336, 112), Color(INK, 0.88))
 	legend.name = "Legend"
-	label(legend, "Swipe — move · jump · slide", Rect2(20, 18, 280, 30), 18)
-	label(legend, "Tap — counter", Rect2(20, 54, 280, 32), 20, GOLD)
+	label(legend, "QUICK CONTROLS", Rect2(18, 12, 300, 20), 14, GOLD)
+	label(legend, "Swipe  ·  move / jump / slide", Rect2(18, 36, 300, 28), 17)
+	label(legend, "Tap  ·  counter", Rect2(18, 68, 300, 28), 19, GOLD)
 	hud.visible = false
 
 func _build_overlays() -> void:
 	pause_overlay = Control.new()
 	pause_overlay.name = "PauseOverlay"
 	interface.add_child(pause_overlay)
-	panel(pause_overlay, Rect2(24, 291, 492, 415), INK)
-	label(pause_overlay, "TAKE A BREATH", Rect2(48, 308, 440, 62), 48, GOLD)
-	label(pause_overlay, "The city can wait.", Rect2(48, 384, 440, 35), 23)
-	button(pause_overlay, "Resume", Rect2(48, 444, 444, 60), pause_run, true)
-	var motion := CheckButton.new()
+	panel(pause_overlay, Rect2(24, 276, 492, 430), INK)
+	label(pause_overlay, "RUN PAUSED", Rect2(48, 295, 440, 20), 15, GOLD)
+	label(pause_overlay, "Take a breath.", Rect2(48, 323, 440, 58), 48, PAPER)
+	label(pause_overlay, "The city can wait.", Rect2(48, 385, 440, 35), 22)
+	button(pause_overlay, "RESUME RUN   →", Rect2(48, 445, 444, 60), pause_run, true)
+	motion_toggle = CheckButton.new()
+	var motion := motion_toggle
 	motion.text = "Reduced motion"
 	motion.position = Vector2(48, 523)
 	motion.size = Vector2(213, 56)
@@ -213,7 +243,8 @@ func _build_overlays() -> void:
 		reduced_motion = value
 		_save_settings())
 	pause_overlay.add_child(motion)
-	var sound := CheckButton.new()
+	sound_toggle = CheckButton.new()
+	var sound := sound_toggle
 	sound.text = "Sound"
 	sound.position = Vector2(279, 523)
 	sound.size = Vector2(213, 56)
@@ -223,17 +254,18 @@ func _build_overlays() -> void:
 		muted = not value
 		_save_settings())
 	pause_overlay.add_child(sound)
-	button(pause_overlay, "Back to title", Rect2(48, 615, 444, 60), return_to_title)
+	button(pause_overlay, "BACK TO TITLE", Rect2(48, 615, 444, 60), return_to_title)
 	pause_overlay.visible = false
 	result_overlay = Control.new()
 	result_overlay.name = "ResultOverlay"
 	interface.add_child(result_overlay)
-	panel(result_overlay, Rect2(24, 291, 492, 415), INK)
-	label(result_overlay, "ONE MORE RUN?", Rect2(48, 308, 440, 62), 48, GOLD)
+	panel(result_overlay, Rect2(24, 276, 492, 430), INK)
+	label(result_overlay, "RUN COMPLETE  /  REPORT", Rect2(48, 295, 440, 20), 15, GOLD)
+	label(result_overlay, "One more run?", Rect2(48, 323, 440, 58), 48, PAPER)
 	result_label = label(result_overlay, "", Rect2(48, 385, 440, 150), 22)
 	result_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	button(result_overlay, "Run again", Rect2(48, 545, 444, 64), start_run, true)
-	button(result_overlay, "Back to title", Rect2(48, 625, 444, 60), return_to_title)
+	button(result_overlay, "RUN AGAIN   →", Rect2(48, 545, 444, 64), start_run, true)
+	button(result_overlay, "BACK TO TITLE", Rect2(48, 625, 444, 60), return_to_title)
 	result_overlay.visible = false
 
 func _fresh_seed() -> int:
@@ -379,6 +411,12 @@ func _load_settings() -> void:
 		best_score = int(config.get_value("run", "best_score", 0))
 		muted = bool(config.get_value("options", "muted", false))
 		reduced_motion = bool(config.get_value("options", "reduced_motion", false))
+	if motion_toggle != null:
+		motion_toggle.set_pressed_no_signal(reduced_motion)
+	if sound_toggle != null:
+		sound_toggle.set_pressed_no_signal(not muted)
+	if best_score_label != null:
+		best_score_label.text = "BEST  %04d" % best_score
 
 func _save_settings() -> void:
 	var config := ConfigFile.new()
@@ -476,10 +514,12 @@ func _sync_ui() -> void:
 	hud.visible = model.state != "title"
 	pause_overlay.visible = model.state == "paused"
 	result_overlay.visible = model.state == "dead"
-	life_label.text = "● ".repeat(maxi(0, model.hp))
+	life_label.text = "●  ".repeat(maxi(0, model.hp)) if model.hp > 0 else "—"
+	life_label.add_theme_color_override("font_color", GOLD if model.hp > 1 else Art.CORAL)
 	score_label.text = "%04d" % model.score
-	var style: String = "  ·  ×%.2f" % model.style_multiplier() if model.combo > 0 else ""
-	distance_label.text = "%d m / %d hits%s" % [int(model.distance), model.combo, style]
+	var style: String = "  ×%.1f" % model.style_multiplier() if model.combo > 0 else ""
+	distance_label.text = "%d m  ·  %d hits%s" % [int(model.distance), model.combo, style]
+	best_score_label.text = "BEST  %04d" % best_score
 	if model.state == "dead" and model.score > best_score:
 		best_score = model.score
 		_save_settings()

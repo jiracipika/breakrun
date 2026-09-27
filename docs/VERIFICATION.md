@@ -128,6 +128,14 @@ Post-fix capture QC: no gate remains, obstacles read as separate depth-separated
 - Full `verify.py --render` pass: 14/14 suites, 293 assertions. Chain reference 587, LIVE and LIVE-STAGGER unchanged; inspector capture verified visually.
 - Not proven: real-device feel; boss fight tuning (telegraph windows, pattern frequency, clear reward) awaits the human playtest gate.
 
+## Seed replay slice (011)
+
+- `test_scene.gd` (23 assertions): the title exposes a `SeedInput` field; a typed seed (12345) starts exactly that run (`run_seed` verified); garbage is stripped to its digits ("ab12cd34" → 1234); an empty field rolls a fresh positive random seed. The field is read only from the title path — "Run again"/Enter/R keep rolling fresh seeds, and the `fixed_seed` test hook still wins over everything.
+- Bug caught red-to-green mid-slice: the refactor initially dropped the fresh-seed fallback, so an empty field called `model.start(0)` — the new test caught it immediately.
+- Title layout re-fit to keep the how-to, seed field, start button and both hint lines inside the panel; verified in the title capture.
+- Full `verify.py --render` pass: 14/14 suites. All existing references unchanged.
+- Not proven: web on-screen keyboard behavior for the LineEdit (physical-phone testing still pending); clipboard-based seed sharing is a tracked follow-up.
+
 ## Review and publication status
 
 Independent spec-review attempt via delegate_task was blocked by GLM HTTP 429 (billing/credits exhausted). It did not review code. A read-only fallback through the installed Codex CLI failed with HTTP 401 because its refresh token had already been used; no authentication configuration was changed. Neither attempt supplies an independent approval.

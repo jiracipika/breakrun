@@ -20,6 +20,7 @@ var result_overlay: Control
 var legend: Panel
 var _legend_age: float = 0.0
 var _legend_done: bool = false
+var seed_input: LineEdit
 var camera: Camera3D
 var burst_pieces: Array = []
 var score_label: Label
@@ -170,9 +171,17 @@ func _build_title() -> void:
 	panel(title, Rect2(28, 624, 484, 303), INK)
 	label(title, "Make your own way through.", Rect2(48, 639, 450, 35), 23)
 	label(title, "Swipe anywhere to move, jump and slide.\nTap to counter the recovery.", Rect2(48, 686, 450, 60), 19)
-	button(title, "Start running", Rect2(48, 771, 444, 62), start_run, true).name = "StartButton"
-	label(title, "Early interaction build · no accounts or ads", Rect2(48, 849, 444, 28), 16)
-	label(title, "Keyboard: WASD + Space  /  Touch: swipe + tap", Rect2(48, 884, 444, 24), 15)
+	seed_input = LineEdit.new()
+	seed_input.name = "SeedInput"
+	seed_input.placeholder_text = "Seed (optional) — race a friend's run"
+	seed_input.position = Vector2(48, 758)
+	seed_input.size = Vector2(444, 42)
+	seed_input.max_length = 12
+	seed_input.add_theme_font_size_override("font_size", 18)
+	title.add_child(seed_input)
+	button(title, "Start running", Rect2(48, 810, 444, 58), start_run, true).name = "StartButton"
+	label(title, "Early interaction build · no accounts or ads", Rect2(48, 876, 444, 24), 15)
+	label(title, "Keyboard: WASD + Space  /  Touch: swipe + tap", Rect2(48, 902, 444, 24), 15)
 
 func _build_hud() -> void:
 	hud = Control.new()
@@ -240,9 +249,25 @@ func _fresh_seed() -> int:
 	# Global RNG is entropy-seeded in Godot 4; mix the clock so rapid restarts differ.
 	return absi(int(Time.get_ticks_usec()) ^ randi())
 
+## The title's optional seed field: forgiving digits-only parse; anything
+## empty or unparseable rolls the usual fresh random seed.
+func _title_seed() -> int:
+	var digits := ""
+	for character in seed_input.text:
+		if character >= "0" and character <= "9":
+			digits += character
+	if digits.is_empty():
+		return 0
+	return clampi(int(digits), 1, 2147483647)
+
 func start_run() -> void:
 	gestures.cancel()
-	model.start(fixed_seed if fixed_seed != 0 else _fresh_seed())
+	var seed_value: int = fixed_seed
+	if seed_value == 0 and model.state == "title":
+		seed_value = _title_seed()
+	if seed_value == 0:
+		seed_value = _fresh_seed()
+	model.start(seed_value)
 	previous_counters = 0
 	previous_boosts = 0
 	previous_inspectors = 0

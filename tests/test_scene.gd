@@ -42,6 +42,23 @@ func run() -> void:
 				check(game.model.lane == 1, "UI action reaches logical movement")
 				var legend: Control = game.get_node_or_null("Interface/HUD/Legend")
 				check(legend != null and not legend.visible, "legend hides after the first action")
+				var seed_field: LineEdit = game.get_node_or_null("Interface/Title/SeedInput")
+				check(seed_field != null, "title exposes a seed input")
+				game.return_to_title()
+				if seed_field != null:
+					seed_field.text = "12345"
+					game.start_run()
+					check(game.model.state == "running" and game.model.run_seed == 12345,
+						"a typed seed replays that exact run")
+					game.return_to_title()
+					seed_field.text = "ab12cd34"
+					game.start_run()
+					check(game.model.run_seed == 1234, "garbage is stripped to its digits")
+					game.return_to_title()
+					seed_field.text = ""
+					game.start_run()
+					check(game.model.state == "running" and game.model.run_seed > 0,
+						"an empty field rolls a fresh random seed")
 				game.start_run()
 				check(legend.visible, "gesture legend shows at run start")
 				game._physics_process(6.0)

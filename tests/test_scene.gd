@@ -72,6 +72,20 @@ func run() -> void:
 				if copy_seed != null:
 					copy_seed.pressed.emit()
 					check(copy_seed.text.begins_with("Copied"), "copying acknowledges with feedback")
+				game.return_to_title()
+				game.start_run()
+				game.model.upgrade_offer = ["pinball", "relay"]
+				game._sync_ui()
+				var upgrade_overlay: Control = game.get_node_or_null("Interface/UpgradeOverlay")
+				check(upgrade_overlay != null and upgrade_overlay.visible,
+					"an open offer shows the perk overlay")
+				if upgrade_overlay != null and upgrade_overlay.visible:
+					# Overlay children: panel, title, subtitle, perk card 0.
+					var perk_button: Button = upgrade_overlay.get_child(3)
+					perk_button.pressed.emit()
+					check(game.model.owned_upgrades.has("pinball") and game.model.upgrade_offer.is_empty(),
+						"picking a card owns the perk and resumes")
+					check(not upgrade_overlay.visible, "the perk overlay hides after the pick")
 				game.start_run()
 				check(game.model.hp == 3 and game.model.distance == 0.0, "restart clears old run")
 			game.free()

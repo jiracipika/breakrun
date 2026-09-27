@@ -152,6 +152,14 @@ Post-fix capture QC: no gate remains, obstacles read as separate depth-separated
 - Full `verify.py --render` pass: 15/15 suites. All gameplay references unchanged.
 - Not proven: real-device frame-time gains from pooling (phone gate); the splash change is visual-only.
 
+## Perks slice (014)
+
+- `test_upgrades.gd` (23 assertions): an inspector defeat draws two distinct unowned perks (seeded offers), the world and inputs freeze during the choice, picking owns the perk and resumes; pinball's launched robot ricochets once into the adjacent lane after its first own-lane strike and scores it; springstep stretches the boost to 1.8 s and it still ends; street broom stretches the launched cull to 2.25 s; crossing launched robots pay one +50 relay, never twice; a flawless inspector clear heals one pip with the perk (capped at three, nothing when damaged or unowned); offers never include owned perks and an exhausted pool offers nothing.
+- Scene check (`test_scene.gd`, 28 assertions): an open offer shows the perk overlay with named cards; picking a card owns the perk, hides the overlay, and resumes. Owned perks are listed on the result screen.
+- **Latent bug fixed — the launched-projectile self-strike.** The strike loop never excluded the projectile itself; shields were exempt by kind, but launched kickers and springs (slices 008/009) had been self-striking on their first tick — phantom +100/125 scores and an instant "cleared" state — masked by a chain test that passed against the bug. `test_kicker.gd` now stages a real trailing dummy (12 assertions, honest chain); the strike list excludes launched robots.
+- Full `verify.py --render` pass: 16/16 suites. Chain reference 587 and all LIVE markers unchanged.
+- Not proven: perk balance and card pacing (the reopened playtest gate); a full human run reaching a second inspector.
+
 ## Review and publication status
 
 Independent spec-review attempt via delegate_task was blocked by GLM HTTP 429 (billing/credits exhausted). It did not review code. A read-only fallback through the installed Codex CLI failed with HTTP 401 because its refresh token had already been used; no authentication configuration was changed. Neither attempt supplies an independent approval.

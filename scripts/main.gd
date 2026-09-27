@@ -30,6 +30,8 @@ var life_label: Label
 var distance_label: Label
 var instruction: Label
 var result_label: Label
+var upgrade_overlay: Control
+var perk_buttons: Array = []
 var enemy_nodes: Dictionary = {}
 var enemy_kinds: Dictionary = {}
 var enemy_pool: Dictionary = {}
@@ -250,6 +252,26 @@ func _build_overlays() -> void:
 	button(result_overlay, "Run again", Rect2(48, 558, 444, 58), start_run, true)
 	button(result_overlay, "Back to title", Rect2(48, 626, 444, 60), return_to_title)
 	result_overlay.visible = false
+	# Perk choice after a Route Inspector clear: the world is frozen until a
+	# card is picked, so there is no timer and no way to lose here.
+	upgrade_overlay = Control.new()
+	upgrade_overlay.name = "UpgradeOverlay"
+	interface.add_child(upgrade_overlay)
+	panel(upgrade_overlay, Rect2(24, 251, 492, 495), INK)
+	label(upgrade_overlay, "PICK A PERK", Rect2(48, 268, 440, 62), 48, GOLD)
+	label(upgrade_overlay, "The inspector drops a boon. The city waits.", Rect2(48, 342, 440, 30), 19)
+	for i in range(2):
+		var perk: Button = button(upgrade_overlay, "", Rect2(48, 392 + i * 104, 444, 88), pick_perk.bind(i), true)
+		perk.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		perk.add_theme_font_size_override("font_size", 18)
+		perk_buttons.append(perk)
+	upgrade_overlay.visible = false
+
+## The card tap: own the perk at this index and unfreeze the run.
+func pick_perk(index: int) -> void:
+	if index < model.upgrade_offer.size():
+		model.take_upgrade(model.upgrade_offer[index])
+		_sync_ui()
 
 ## Put the shown seed on the clipboard so sharing needs no retyping. Web gets
 ## the async navigator API (HTTPS + this tap gesture satisfy its rules);
@@ -534,6 +556,12 @@ func _sync_ui() -> void:
 	hud.visible = model.state != "title"
 	pause_overlay.visible = model.state == "paused"
 	result_overlay.visible = model.state == "dead"
+	upgrade_overlay.visible = not model.upgrade_offer.is_empty()
+	if upgrade_overlay.visible:
+		for i in range(perk_buttons.size()):
+			if i < model.upgrade_offer.size():
+				var perk_name: String = model.upgrade_offer[i]
+				perk_buttons[i].text = "%s\n%s" % [perk_name.capitalize(), Model.UPGRADES[perk_name]]
 	life_label.text = "● ".repeat(maxi(0, model.hp))
 	score_label.text = "%04d" % model.score
 	var style: String = "  ·  ×%.2f" % model.style_multiplier() if model.combo > 0 else ""
@@ -542,7 +570,12 @@ func _sync_ui() -> void:
 		best_score = model.score
 		_save_settings()
 	var best_mark: String = "  (new!)" if model.state == "dead" and model.score == best_score and model.score > 0 else ""
-	result_label.text = "%d points · %d metres%s\nCounters %d · Chains %d · best ×%.2f\nBest: %d · Seed %d\n%s" % [model.score, int(model.distance), best_mark, model.counter_count, model.chain_count, model.style_multiplier(), best_score, model.run_seed, _failure_line()]
+	var perks: String = ""
+	for name in model.owned_upgrades:
+		perks += name.capitalize() + " "
+	if perks != "":
+		perks = " · " + perks.strip_edges()
+	result_label.text = "%d points · %d metres%s\nCounters %d · Chains %d · best ×%.2f\nBest: %d · Seed %d%s\n%s" % [model.score, int(model.distance), best_mark, model.counter_count, model.chain_count, model.style_multiplier(), best_score, model.run_seed, perks, _failure_line()]
 	var text: String = "Move out of the shield's lane when it winds up."
 	var ready_to_counter: bool = false
 	if not model.inspector.is_empty():

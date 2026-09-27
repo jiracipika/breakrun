@@ -81,8 +81,12 @@ func _init() -> void:
 	check(greedy.counter_count == 0 and greedy.feedback.begins_with("Slide under"),
 		"an undodged kicker refuses the strike with the slide hint")
 
-	# The full sweep-strike-chain: slide under, strike in recovery, kicker trips the dummy.
+	# The full sweep-strike-chain: slide under, strike in recovery, kicker
+	# trips the trailing dummy staged just behind it.
 	var chain = kicker_run(Model, 0)
+	chain.enemies.append({"id": 901, "kind": "dummy", "lane": 0, "z": 14.0,
+		"phase": "approach", "dodged": false, "age": 0.0, "hits": 0,
+		"rewarded": false, "swept": false, "ricocheted": false, "previous_z": 14.0})
 	chain.act("slide")
 	steps = 0
 	while by_id(chain, 900).z > 5.5 and steps < 4000:

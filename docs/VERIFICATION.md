@@ -136,6 +136,14 @@ Post-fix capture QC: no gate remains, obstacles read as separate depth-separated
 - Full `verify.py --render` pass: 14/14 suites. All existing references unchanged.
 - Not proven: web on-screen keyboard behavior for the LineEdit (physical-phone testing still pending); clipboard-based seed sharing is a tracked follow-up.
 
+## Share and punch slice (012)
+
+- Copyable seed: the result screen's "Copy seed" button writes `model.run_seed` to the clipboard (web: `navigator.clipboard.writeText` via JavaScriptBridge — HTTPS plus the tap gesture satisfy its rules; native: `DisplayServer.clipboard_set`) and flips to "Copied!" for 1.5 s. `test_scene.gd` (24 assertions) covers existence, press safety and the acknowledgment; actual clipboard contents are not proven headlessly and are not claimed.
+- Authored anticipation: the shield robot now pulls back (lean + slight retreat) across z 12→9 of its approach before the bash lunge — anticipation then release; the counter kick raises the leg higher and leans the torso into it (reduced-motion suppresses the kick lean as before).
+- Integration bug caught by the suites: an extra `add_child` on the copy button (the `button()` helper already parents) broke scene construction in three suites — fixed by naming the node instead.
+- Full `verify.py --render` pass: 14/14 suites. LIVE and LIVE-STAGGER markers unchanged; result-screen capture reviewed after the layout fix.
+- Not proven: real clipboard contents on desktop/web; readability of the wind-up and kick reach (playtest gate).
+
 ## Review and publication status
 
 Independent spec-review attempt via delegate_task was blocked by GLM HTTP 429 (billing/credits exhausted). It did not review code. A read-only fallback through the installed Codex CLI failed with HTTP 401 because its refresh token had already been used; no authentication configuration was changed. Neither attempt supplies an independent approval.

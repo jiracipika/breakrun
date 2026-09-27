@@ -21,6 +21,8 @@ var legend: Panel
 var _legend_age: float = 0.0
 var _legend_done: bool = false
 var seed_input: LineEdit
+var copy_seed_button: Button
+var copy_seed_timer: float = 0.0
 var camera: Camera3D
 var burst_pieces: Array = []
 var score_label: Label
@@ -239,11 +241,31 @@ func _build_overlays() -> void:
 	interface.add_child(result_overlay)
 	panel(result_overlay, Rect2(24, 291, 492, 415), INK)
 	label(result_overlay, "ONE MORE RUN?", Rect2(48, 308, 440, 62), 48, GOLD)
-	result_label = label(result_overlay, "", Rect2(48, 385, 440, 150), 22)
+	result_label = label(result_overlay, "", Rect2(48, 385, 440, 118), 22)
 	result_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	button(result_overlay, "Run again", Rect2(48, 545, 444, 64), start_run, true)
-	button(result_overlay, "Back to title", Rect2(48, 625, 444, 60), return_to_title)
+	copy_seed_button = button(result_overlay, "Copy seed", Rect2(48, 510, 200, 38), copy_seed)
+	copy_seed_button.name = "CopySeed"
+	button(result_overlay, "Run again", Rect2(48, 558, 444, 58), start_run, true)
+	button(result_overlay, "Back to title", Rect2(48, 626, 444, 60), return_to_title)
 	result_overlay.visible = false
+
+## Put the shown seed on the clipboard so sharing needs no retyping. Web gets
+## the async navigator API (HTTPS + this tap gesture satisfy its rules);
+## native builds use the display server. Acknowledge either way.
+func copy_seed() -> void:
+	var seed_text: String = str(model.run_seed)
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("navigator.clipboard.writeText('%s');" % seed_text, true)
+	else:
+		DisplayServer.clipboard_set(seed_text)
+	copy_seed_button.text = "Copied!"
+	copy_seed_timer = 1.5
+
+func _tick_copy_feedback(delta: float) -> void:
+	if copy_seed_timer > 0.0:
+		copy_seed_timer = maxf(0.0, copy_seed_timer - delta)
+		if copy_seed_timer == 0.0:
+			copy_seed_button.text = "Copy seed"
 
 func _fresh_seed() -> int:
 	# Global RNG is entropy-seeded in Godot 4; mix the clock so rapid restarts differ.
@@ -589,10 +611,13 @@ func _sync_world(delta: float) -> void:
 			_spawn_burst()
 	kick_timer = maxf(0.0, kick_timer - delta)
 	if kick_timer > 0 and not reduced_motion:
-		runner.get_node("LegR").rotation.x = -1.6
+		# A reaching kick: leg swings high and the torso leans into it.
+		runner.get_node("LegR").rotation.x = -2.1
+		runner.rotation.x = 0.18
 		runner.rotation.z = 0.23 * (model.lane - model.last_counter_lane)
 	else:
 		runner.rotation.z = 0.0
+	_tick_copy_feedback(delta)
 	# Counter kick punches the view wider; a boost eases it wider still.
 	var fov_kick: float = 0.0
 	if kick_timer > 0 and not reduced_motion:
@@ -624,6 +649,11 @@ func _sync_world(delta: float) -> void:
 			actor.position.y = 0.35
 			# Cartwheel away small: a full-size flat plate reads as a slab.
 			actor.scale = Vector3(0.62, 0.62, 0.62)
+		elif enemy.phase == "approach" and enemy.kind == "shield" and enemy.z <= 12.0:
+			# Authored wind-up: pull back before the bash lunge so the attack
+			# reads as anticipation then release.
+			actor.rotation.x = 0.14
+			actor.position.z -= 0.35
 		elif enemy.phase == "approach" and enemy.kind == "dummy":
 			# Idle sway so stacked dummies don't merge into one clump.
 			actor.rotation.z = 0.05 * sin(model.time * 3.0 + float(enemy.id))

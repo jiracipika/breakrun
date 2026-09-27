@@ -67,6 +67,11 @@ func run() -> void:
 				game.model.state = "dead"
 				game._physics_process(0.01)
 				check(game.result_overlay.visible, "death displays result screen")
+				var copy_seed: Button = game.get_node_or_null("Interface/ResultOverlay/CopySeed")
+				check(copy_seed != null, "result screen exposes a copy-seed button")
+				if copy_seed != null:
+					copy_seed.pressed.emit()
+					check(copy_seed.text.begins_with("Copied"), "copying acknowledges with feedback")
 				game.start_run()
 				check(game.model.hp == 3 and game.model.distance == 0.0, "restart clears old run")
 			game.free()

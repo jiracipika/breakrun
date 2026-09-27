@@ -189,7 +189,7 @@ func _build_title() -> void:
 	panel(title, Rect2(28, 624, 484, 303), INK)
 	label(title, "ROOFTOP RUN  /  ENDLESS", Rect2(50, 642, 430, 22), 15, GOLD)
 	label(title, "Every enemy is a weapon.", Rect2(50, 672, 440, 40), 29)
-	label(title, "Swipe to move, jump or slide.\\nTap during recovery to counter.", Rect2(50, 719, 430, 52), 19)
+	label(title, "Swipe to move, jump or slide.\nTap during recovery to counter.", Rect2(50, 719, 430, 52), 19)
 	button(title, "START RUN   →", Rect2(48, 786, 444, 62), start_run, true).name = "StartButton"
 	best_score_label = label(title, "BEST  %04d" % best_score, Rect2(50, 860, 160, 22), 16, GOLD)
 	label(title, "WASD / arrows + Space   ·   Touch: swipe + tap", Rect2(50, 890, 440, 20), 14)
@@ -519,10 +519,10 @@ func _sync_ui() -> void:
 	score_label.text = "%04d" % model.score
 	var style: String = "  ×%.1f" % model.style_multiplier() if model.combo > 0 else ""
 	distance_label.text = "%d m  ·  %d hits%s" % [int(model.distance), model.combo, style]
-	best_score_label.text = "BEST  %04d" % best_score
 	if model.state == "dead" and model.score > best_score:
 		best_score = model.score
 		_save_settings()
+	best_score_label.text = "BEST  %04d" % best_score
 	var best_mark: String = "  (new!)" if model.state == "dead" and model.score == best_score and model.score > 0 else ""
 	result_label.text = "%d points · %d metres%s\nCounters %d · Chains %d · best ×%.2f\nBest: %d · Seed %d\n%s" % [model.score, int(model.distance), best_mark, model.counter_count, model.chain_count, model.style_multiplier(), best_score, model.run_seed, _failure_line()]
 	var text: String = "Move out of the shield's lane when it winds up."

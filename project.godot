@@ -6,6 +6,8 @@ run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/description="Sunbreak Riot — a combat runner interaction prototype."
 config/icon="res://icon.png"
+boot_splash/show_image=false
+boot_splash/bg_color=Color(0.0392157, 0.0392157, 0.0588235, 1)
 
 [display]
 window/size/viewport_width=540

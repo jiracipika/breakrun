@@ -128,6 +128,38 @@ Post-fix capture QC: no gate remains, obstacles read as separate depth-separated
 - Full `verify.py --render` pass: 14/14 suites, 293 assertions. Chain reference 587, LIVE and LIVE-STAGGER unchanged; inspector capture verified visually.
 - Not proven: real-device feel; boss fight tuning (telegraph windows, pattern frequency, clear reward) awaits the human playtest gate.
 
+## Seed replay slice (011)
+
+- `test_scene.gd` (23 assertions): the title exposes a `SeedInput` field; a typed seed (12345) starts exactly that run (`run_seed` verified); garbage is stripped to its digits ("ab12cd34" → 1234); an empty field rolls a fresh positive random seed. The field is read only from the title path — "Run again"/Enter/R keep rolling fresh seeds, and the `fixed_seed` test hook still wins over everything.
+- Bug caught red-to-green mid-slice: the refactor initially dropped the fresh-seed fallback, so an empty field called `model.start(0)` — the new test caught it immediately.
+- Title layout re-fit to keep the how-to, seed field, start button and both hint lines inside the panel; verified in the title capture.
+- Full `verify.py --render` pass: 14/14 suites. All existing references unchanged.
+- Not proven: web on-screen keyboard behavior for the LineEdit (physical-phone testing still pending); clipboard-based seed sharing is a tracked follow-up.
+
+## Share and punch slice (012)
+
+- Copyable seed: the result screen's "Copy seed" button writes `model.run_seed` to the clipboard (web: `navigator.clipboard.writeText` via JavaScriptBridge — HTTPS plus the tap gesture satisfy its rules; native: `DisplayServer.clipboard_set`) and flips to "Copied!" for 1.5 s. `test_scene.gd` (24 assertions) covers existence, press safety and the acknowledgment; actual clipboard contents are not proven headlessly and are not claimed.
+- Authored anticipation: the shield robot now pulls back (lean + slight retreat) across z 12→9 of its approach before the bash lunge — anticipation then release; the counter kick raises the leg higher and leans the torso into it (reduced-motion suppresses the kick lean as before).
+- Integration bug caught by the suites: an extra `add_child` on the copy button (the `button()` helper already parents) broke scene construction in three suites — fixed by naming the node instead.
+- Full `verify.py --render` pass: 14/14 suites. LIVE and LIVE-STAGGER markers unchanged; result-screen capture reviewed after the layout fix.
+- Not proven: real clipboard contents on desktop/web; readability of the wind-up and kick reach (playtest gate).
+
+## Pooling and splash slice (013)
+
+- `test_pool.gd` (4 assertions): driving the real scene for two 60-second legs with a restart between them keeps enemy node-tree creation bounded (growth of 3 after warm-up; ~30+ before pooling), the live id mapping stays ≤ 12, live-plus-pooled nodes stay ≤ 24, and the run survives. Culled enemies now hide into a kind-keyed pool; spawns take a pooled node first; restarts release to the pool and clear the id map so a previous run's ids can never adopt a mismatched kind; reused pivots (kicker foot, courier sweep leg, stripe) reset on acquire so a node never carries its last life's pose.
+- Boot splash set to plain ink with no image — the engine logo no longer flashes between the web loading screen and the title.
+- Capture-flake hardening: one render capture failed because macOS stole window focus mid-choreography, firing the game's legitimate focus-loss pause; the capture now auto-resumes an unexpected pause before the deliberate pause assertion at frame 326 (rerun green, then full suite green).
+- Full `verify.py --render` pass: 15/15 suites. All gameplay references unchanged.
+- Not proven: real-device frame-time gains from pooling (phone gate); the splash change is visual-only.
+
+## Perks slice (014)
+
+- `test_upgrades.gd` (23 assertions): an inspector defeat draws two distinct unowned perks (seeded offers), the world and inputs freeze during the choice, picking owns the perk and resumes; pinball's launched robot ricochets once into the adjacent lane after its first own-lane strike and scores it; springstep stretches the boost to 1.8 s and it still ends; street broom stretches the launched cull to 2.25 s; crossing launched robots pay one +50 relay, never twice; a flawless inspector clear heals one pip with the perk (capped at three, nothing when damaged or unowned); offers never include owned perks and an exhausted pool offers nothing.
+- Scene check (`test_scene.gd`, 28 assertions): an open offer shows the perk overlay with named cards; picking a card owns the perk, hides the overlay, and resumes. Owned perks are listed on the result screen.
+- **Latent bug fixed — the launched-projectile self-strike.** The strike loop never excluded the projectile itself; shields were exempt by kind, but launched kickers and springs (slices 008/009) had been self-striking on their first tick — phantom +100/125 scores and an instant "cleared" state — masked by a chain test that passed against the bug. `test_kicker.gd` now stages a real trailing dummy (12 assertions, honest chain); the strike list excludes launched robots.
+- Full `verify.py --render` pass: 16/16 suites. Chain reference 587 and all LIVE markers unchanged.
+- Not proven: perk balance and card pacing (the reopened playtest gate); a full human run reaching a second inspector.
+
 ## Review and publication status
 
 Independent spec-review attempt via delegate_task was blocked by GLM HTTP 429 (billing/credits exhausted). It did not review code. A read-only fallback through the installed Codex CLI failed with HTTP 401 because its refresh token had already been used; no authentication configuration was changed. Neither attempt supplies an independent approval.

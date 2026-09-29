@@ -20,6 +20,9 @@ var result_overlay: Control
 var legend: Panel
 var _legend_age: float = 0.0
 var _legend_done: bool = false
+var seed_input: LineEdit
+var copy_seed_button: Button
+var copy_seed_timer: float = 0.0
 var camera: Camera3D
 var burst_pieces: Array = []
 var score_label: Label
@@ -30,7 +33,11 @@ var motion_toggle: CheckButton
 var sound_toggle: CheckButton
 var instruction: Label
 var result_label: Label
+var upgrade_overlay: Control
+var perk_buttons: Array = []
 var enemy_nodes: Dictionary = {}
+var enemy_kinds: Dictionary = {}
+var enemy_pool: Dictionary = {}
 var inspector_node: Node3D
 var counter_ring: MeshInstance3D
 var warning_lane: MeshInstance3D
@@ -111,23 +118,18 @@ func panel(parent: Node, rect: Rect2, color: Color = PANEL) -> Panel:
 	var node := Panel.new()
 	node.position = rect.position
 	node.size = rect.size
-	# Panels must never consume drags: swipes can start anywhere on the track.
 	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := StyleBoxFlat.new()
 	style.bg_color = color
-	style.corner_radius_top_left = 14
-	style.corner_radius_top_right = 14
-	style.corner_radius_bottom_left = 14
-	style.corner_radius_bottom_right = 5
-	style.border_color = Color("39394f")
+	style.border_color = Color(PAPER, 0.12)
 	style.set_border_width_all(1)
-	style.shadow_color = Color(0.0, 0.0, 0.0, 0.24)
+	style.set_corner_radius_all(12)
+	style.shadow_color = Color(INK, 0.24)
 	style.shadow_size = 8
-	style.shadow_offset = Vector2(0, 5)
+	style.shadow_offset = Vector2(0, 4)
 	node.add_theme_stylebox_override("panel", style)
 	parent.add_child(node)
 	return node
-
 func label(parent: Node, text: String, rect: Rect2, font_size: int, color: Color = PAPER) -> Label:
 	var node := Label.new()
 	node.text = text
@@ -146,37 +148,31 @@ func button(parent: Node, text: String, rect: Rect2, action: Callable, primary: 
 	node.text = text
 	node.position = rect.position
 	node.size = rect.size
-	# Runner inputs land on touch-down; release-only buttons feel laggy.
 	node.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	node.focus_mode = Control.FOCUS_ALL
 	node.add_theme_font_size_override("font_size", 22)
 	node.add_theme_constant_override("outline_size", 1)
-	node.focus_mode = Control.FOCUS_ALL
-	node.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	node.add_theme_color_override("font_color", INK if primary else PAPER)
 	node.add_theme_color_override("font_disabled_color", Color(PAPER, 0.45))
+	node.add_theme_color_override("font_hover_color", INK if primary else GOLD)
+	node.add_theme_color_override("font_focus_color", INK if primary else GOLD)
+	node.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
 		var style := StyleBoxFlat.new()
 		if state == "pressed":
-			# Press inverts the palette so every tap is visibly acknowledged.
 			style.bg_color = PAPER if primary else PANEL.lightened(0.28)
 		elif state == "disabled":
 			style.bg_color = Color("16161f")
-		elif state == "hover" or state == "focus":
-			style.bg_color = GOLD.lightened(0.08) if primary else PANEL.lightened(0.20)
 		else:
 			style.bg_color = GOLD if primary else PANEL
-		style.border_color = PAPER if state in ["focus", "hover", "pressed"] else Color("39394f")
+		style.border_color = PAPER if state in ["focus", "hover", "pressed"] else Color(PAPER, 0.14)
 		style.set_border_width_all(2 if state in ["focus", "hover", "pressed"] else 1)
-		style.corner_radius_top_left = 12
-		style.corner_radius_top_right = 12
-		style.corner_radius_bottom_left = 12
-		style.corner_radius_bottom_right = 4
+		style.set_corner_radius_all(10)
 		node.add_theme_stylebox_override(state, style)
 	if action.is_valid():
 		node.pressed.connect(action)
 	parent.add_child(node)
 	return node
-
 func _build_title() -> void:
 	title = Control.new()
 	title.name = "Title"
@@ -189,47 +185,62 @@ func _build_title() -> void:
 	panel(title, Rect2(28, 624, 484, 303), INK)
 	label(title, "ROOFTOP RUN  /  ENDLESS", Rect2(50, 642, 430, 22), 15, GOLD)
 	label(title, "Every enemy is a weapon.", Rect2(50, 672, 440, 40), 29)
-	label(title, "Swipe to move, jump or slide.\nTap during recovery to counter.", Rect2(50, 719, 430, 52), 19)
-	button(title, "START RUN   →", Rect2(48, 786, 444, 62), start_run, true).name = "StartButton"
-	best_score_label = label(title, "BEST  %04d" % best_score, Rect2(50, 860, 160, 22), 16, GOLD)
-	label(title, "WASD / arrows + Space   ·   Touch: swipe + tap", Rect2(50, 890, 440, 20), 14)
-
+	label(title, "Swipe to move, jump or slide.\nTap to counter after dodging an attack.", Rect2(50, 715, 430, 42), 17)
+	seed_input = LineEdit.new()
+	seed_input.name = "SeedInput"
+	seed_input.placeholder_text = "Seed (optional) — race a friend's run"
+	seed_input.position = Vector2(48, 763)
+	seed_input.size = Vector2(444, 38)
+	seed_input.max_length = 12
+	seed_input.add_theme_font_size_override("font_size", 17)
+	seed_input.add_theme_color_override("font_color", PAPER)
+	var seed_style := StyleBoxFlat.new()
+	seed_style.bg_color = PANEL
+	seed_style.border_color = Color("39394f")
+	seed_style.set_border_width_all(1)
+	seed_style.set_corner_radius_all(8)
+	seed_input.add_theme_stylebox_override("normal", seed_style)
+	var seed_focus := seed_style.duplicate()
+	seed_focus.border_color = PAPER
+	seed_focus.set_border_width_all(2)
+	seed_input.add_theme_stylebox_override("focus", seed_focus)
+	title.add_child(seed_input)
+	button(title, "START RUN   →", Rect2(48, 810, 444, 58), start_run, true).name = "StartButton"
+	best_score_label = label(title, "BEST  %04d" % best_score, Rect2(50, 880, 128, 22), 16, GOLD)
+	label(title, "WASD / SPACE  ·  SWIPE / TAP", Rect2(190, 882, 300, 20), 14)
 func _build_hud() -> void:
 	hud = Control.new()
 	hud.name = "HUD"
 	interface.add_child(hud)
 	panel(hud, Rect2(24, 26, 492, 100), INK)
-	label(hud, "INTEGRITY", Rect2(42, 37, 120, 20), 14, GOLD)
-	life_label = label(hud, "", Rect2(42, 60, 124, 32), 25, PAPER)
-	label(hud, "SCORE", Rect2(180, 37, 175, 20), 14, GOLD)
-	score_label = label(hud, "0", Rect2(180, 54, 175, 48), 42)
-	distance_label = label(hud, "", Rect2(180, 100, 175, 20), 14)
+	label(hud, "INTEGRITY", Rect2(42, 37, 124, 20), 14, GOLD)
+	life_label = label(hud, "", Rect2(42, 58, 124, 36), 24, GOLD)
+	label(hud, "SCORE", Rect2(181, 37, 170, 20), 14, GOLD)
+	score_label = label(hud, "0", Rect2(181, 54, 170, 44), 40)
+	distance_label = label(hud, "", Rect2(181, 101, 300, 20), 14)
 	button(hud, "PAUSE", Rect2(405, 47, 88, 56), pause_run).name = "PauseButton"
-	panel(hud, Rect2(24, 141, 492, 72), INK)
-	var signal_accent := ColorRect.new()
-	signal_accent.position = Vector2(24, 151)
-	signal_accent.size = Vector2(5, 54)
-	signal_accent.color = GOLD
-	signal_accent.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hud.add_child(signal_accent)
-	instruction = label(hud, "", Rect2(46, 151, 450, 54), 20)
+	panel(hud, Rect2(24, 151, 492, 68), INK)
+	var accent := ColorRect.new()
+	accent.position = Vector2(24, 151)
+	accent.size = Vector2(5, 68)
+	accent.color = GOLD
+	accent.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud.add_child(accent)
+	instruction = label(hud, "", Rect2(46, 157, 450, 56), 19)
 	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	# Gesture legend in the space the old button bar vacated: the whole screen
-	# is the controller now, and this teaches it until the player acts.
 	legend = panel(hud, Rect2(102, 630, 336, 112), Color(INK, 0.88))
 	legend.name = "Legend"
-	label(legend, "QUICK CONTROLS", Rect2(18, 12, 300, 20), 14, GOLD)
-	label(legend, "Swipe  ·  move / jump / slide", Rect2(18, 36, 300, 28), 17)
-	label(legend, "Tap  ·  counter", Rect2(18, 68, 300, 28), 19, GOLD)
+	label(legend, "QUICK CONTROLS", Rect2(20, 12, 296, 24), 14, GOLD)
+	label(legend, "Swipe — move · jump · slide", Rect2(20, 39, 296, 28), 17)
+	label(legend, "Tap — counter", Rect2(20, 69, 296, 28), 18, GOLD)
 	hud.visible = false
-
 func _build_overlays() -> void:
 	pause_overlay = Control.new()
 	pause_overlay.name = "PauseOverlay"
 	interface.add_child(pause_overlay)
 	panel(pause_overlay, Rect2(24, 276, 492, 430), INK)
-	label(pause_overlay, "RUN PAUSED", Rect2(48, 295, 440, 20), 15, GOLD)
-	label(pause_overlay, "Take a breath.", Rect2(48, 323, 440, 58), 48, PAPER)
+	label(pause_overlay, "RUN PAUSED", Rect2(48, 295, 440, 24), 16, GOLD)
+	label(pause_overlay, "Take a breath.", Rect2(48, 323, 440, 58), 46, GOLD)
 	label(pause_overlay, "The city can wait.", Rect2(48, 385, 440, 35), 22)
 	button(pause_overlay, "RESUME RUN   →", Rect2(48, 445, 444, 60), pause_run, true)
 	motion_toggle = CheckButton.new()
@@ -237,7 +248,7 @@ func _build_overlays() -> void:
 	motion.text = "Reduced motion"
 	motion.position = Vector2(48, 523)
 	motion.size = Vector2(213, 56)
-	motion.add_theme_font_size_override("font_size", 22)
+	motion.add_theme_font_size_override("font_size", 20)
 	motion.button_pressed = reduced_motion
 	motion.toggled.connect(func(value: bool) -> void:
 		reduced_motion = value
@@ -248,7 +259,7 @@ func _build_overlays() -> void:
 	sound.text = "Sound"
 	sound.position = Vector2(279, 523)
 	sound.size = Vector2(213, 56)
-	sound.add_theme_font_size_override("font_size", 22)
+	sound.add_theme_font_size_override("font_size", 20)
 	sound.button_pressed = not muted
 	sound.toggled.connect(func(value: bool) -> void:
 		muted = not value
@@ -260,21 +271,75 @@ func _build_overlays() -> void:
 	result_overlay.name = "ResultOverlay"
 	interface.add_child(result_overlay)
 	panel(result_overlay, Rect2(24, 276, 492, 430), INK)
-	label(result_overlay, "RUN COMPLETE  /  REPORT", Rect2(48, 295, 440, 20), 15, GOLD)
-	label(result_overlay, "One more run?", Rect2(48, 323, 440, 58), 48, PAPER)
-	result_label = label(result_overlay, "", Rect2(48, 385, 440, 150), 22)
+	label(result_overlay, "RUN COMPLETE  /  REPORT", Rect2(48, 295, 440, 24), 16, GOLD)
+	label(result_overlay, "One more run?", Rect2(48, 323, 440, 58), 46, GOLD)
+	result_label = label(result_overlay, "", Rect2(48, 385, 440, 118), 21)
 	result_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	button(result_overlay, "RUN AGAIN   →", Rect2(48, 545, 444, 64), start_run, true)
-	button(result_overlay, "BACK TO TITLE", Rect2(48, 625, 444, 60), return_to_title)
+	copy_seed_button = button(result_overlay, "COPY SEED", Rect2(48, 510, 200, 38), copy_seed)
+	copy_seed_button.name = "CopySeed"
+	button(result_overlay, "RUN AGAIN   →", Rect2(48, 558, 444, 58), start_run, true)
+	button(result_overlay, "BACK TO TITLE", Rect2(48, 626, 444, 60), return_to_title)
 	result_overlay.visible = false
+	# Perk choice after a Route Inspector clear: the world is frozen until a
+	# card is picked, so there is no timer and no way to lose here.
+	upgrade_overlay = Control.new()
+	upgrade_overlay.name = "UpgradeOverlay"
+	interface.add_child(upgrade_overlay)
+	panel(upgrade_overlay, Rect2(24, 251, 492, 495), INK)
+	label(upgrade_overlay, "PICK A PERK", Rect2(48, 268, 440, 62), 48, GOLD)
+	label(upgrade_overlay, "The inspector drops a boon. The city waits.", Rect2(48, 342, 440, 30), 19)
+	for i in range(2):
+		var perk: Button = button(upgrade_overlay, "", Rect2(48, 392 + i * 104, 444, 88), pick_perk.bind(i), true)
+		perk.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		perk.add_theme_font_size_override("font_size", 18)
+		perk_buttons.append(perk)
+	upgrade_overlay.visible = false
+func pick_perk(index: int) -> void:
+	if index < model.upgrade_offer.size():
+		model.take_upgrade(model.upgrade_offer[index])
+		_sync_ui()
+
+## Put the shown seed on the clipboard so sharing needs no retyping. Web gets
+## the async navigator API (HTTPS + this tap gesture satisfy its rules);
+## native builds use the display server. Acknowledge either way.
+func copy_seed() -> void:
+	var seed_text: String = str(model.run_seed)
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("navigator.clipboard.writeText('%s');" % seed_text, true)
+	else:
+		DisplayServer.clipboard_set(seed_text)
+	copy_seed_button.text = "Copied!"
+	copy_seed_timer = 1.5
+
+func _tick_copy_feedback(delta: float) -> void:
+	if copy_seed_timer > 0.0:
+		copy_seed_timer = maxf(0.0, copy_seed_timer - delta)
+		if copy_seed_timer == 0.0:
+			copy_seed_button.text = "Copy seed"
 
 func _fresh_seed() -> int:
 	# Global RNG is entropy-seeded in Godot 4; mix the clock so rapid restarts differ.
 	return absi(int(Time.get_ticks_usec()) ^ randi())
 
+## The title's optional seed field: forgiving digits-only parse; anything
+## empty or unparseable rolls the usual fresh random seed.
+func _title_seed() -> int:
+	var digits := ""
+	for character in seed_input.text:
+		if character >= "0" and character <= "9":
+			digits += character
+	if digits.is_empty():
+		return 0
+	return clampi(int(digits), 1, 2147483647)
+
 func start_run() -> void:
 	gestures.cancel()
-	model.start(fixed_seed if fixed_seed != 0 else _fresh_seed())
+	var seed_value: int = fixed_seed
+	if seed_value == 0 and model.state == "title":
+		seed_value = _title_seed()
+	if seed_value == 0:
+		seed_value = _fresh_seed()
+	model.start(seed_value)
 	previous_counters = 0
 	previous_boosts = 0
 	previous_inspectors = 0
@@ -286,13 +351,24 @@ func start_run() -> void:
 	for burst in burst_pieces:
 		burst["node"].free()
 	burst_pieces.clear()
-	for node in enemy_nodes.values():
-		node.free()
-	enemy_nodes.clear()
+	_release_all_enemy_nodes()
 	runner.position = Vector3.ZERO
 	runner.rotation = Vector3.ZERO
 	_sync_ui()
 	_sync_world(0.0)
+
+## Retire an enemy node into the kind-keyed pool instead of freeing it.
+func _release_enemy_node(kind: String, node: Node3D) -> void:
+	node.visible = false
+	if not enemy_pool.has(kind):
+		enemy_pool[kind] = []
+	enemy_pool[kind].append(node)
+
+func _release_all_enemy_nodes() -> void:
+	for id in enemy_nodes.keys():
+		_release_enemy_node(enemy_kinds[id], enemy_nodes[id])
+	enemy_nodes.clear()
+	enemy_kinds.clear()
 
 func pause_run() -> void:
 	gestures.cancel()
@@ -302,9 +378,7 @@ func pause_run() -> void:
 func return_to_title() -> void:
 	gestures.cancel()
 	model = Model.new()
-	for node in enemy_nodes.values():
-		node.free()
-	enemy_nodes.clear()
+	_release_all_enemy_nodes()
 	runner.position = Vector3.ZERO
 	runner.rotation = Vector3.ZERO
 	runner.scale = Vector3.ONE
@@ -514,6 +588,12 @@ func _sync_ui() -> void:
 	hud.visible = model.state != "title"
 	pause_overlay.visible = model.state == "paused"
 	result_overlay.visible = model.state == "dead"
+	upgrade_overlay.visible = not model.upgrade_offer.is_empty()
+	if upgrade_overlay.visible:
+		for i in range(perk_buttons.size()):
+			if i < model.upgrade_offer.size():
+				var perk_name: String = model.upgrade_offer[i]
+				perk_buttons[i].text = "%s\n%s" % [perk_name.capitalize(), Model.UPGRADES[perk_name]]
 	life_label.text = "●  ".repeat(maxi(0, model.hp)) if model.hp > 0 else "—"
 	life_label.add_theme_color_override("font_color", GOLD if model.hp > 1 else Art.CORAL)
 	score_label.text = "%04d" % model.score
@@ -524,7 +604,12 @@ func _sync_ui() -> void:
 		_save_settings()
 	best_score_label.text = "BEST  %04d" % best_score
 	var best_mark: String = "  (new!)" if model.state == "dead" and model.score == best_score and model.score > 0 else ""
-	result_label.text = "%d points · %d metres%s\nCounters %d · Chains %d · best ×%.2f\nBest: %d · Seed %d\n%s" % [model.score, int(model.distance), best_mark, model.counter_count, model.chain_count, model.style_multiplier(), best_score, model.run_seed, _failure_line()]
+	var perks: String = ""
+	for name in model.owned_upgrades:
+		perks += name.capitalize() + " "
+	if perks != "":
+		perks = " · " + perks.strip_edges()
+	result_label.text = "%d points · %d metres%s\nCounters %d · Chains %d · best ×%.2f\nBest: %d · Seed %d%s\n%s" % [model.score, int(model.distance), best_mark, model.counter_count, model.chain_count, model.style_multiplier(), best_score, model.run_seed, perks, _failure_line()]
 	var text: String = "Move out of the shield's lane when it winds up."
 	var ready_to_counter: bool = false
 	if not model.inspector.is_empty():
@@ -604,10 +689,13 @@ func _sync_world(delta: float) -> void:
 			_spawn_burst()
 	kick_timer = maxf(0.0, kick_timer - delta)
 	if kick_timer > 0 and not reduced_motion:
-		runner.get_node("LegR").rotation.x = -1.6
+		# A reaching kick: leg swings high and the torso leans into it.
+		runner.get_node("LegR").rotation.x = -2.1
+		runner.rotation.x = 0.18
 		runner.rotation.z = 0.23 * (model.lane - model.last_counter_lane)
 	else:
 		runner.rotation.z = 0.0
+	_tick_copy_feedback(delta)
 	# Counter kick punches the view wider; a boost eases it wider still.
 	var fov_kick: float = 0.0
 	if kick_timer > 0 and not reduced_motion:
@@ -629,7 +717,24 @@ func _sync_world(delta: float) -> void:
 	for enemy in model.enemies:
 		live_ids[enemy.id] = true
 		if not enemy_nodes.has(enemy.id):
-			enemy_nodes[enemy.id] = Art.enemy(world, enemy.kind)
+			var node: Node3D = null
+			var pool: Array = enemy_pool.get(enemy.kind, [])
+			if pool.size() > 0:
+				node = pool.pop_back()
+				node.visible = true
+				# A reused node keeps its last life's telegraph poses.
+				for pivot_name in ["Foot", "SweepLeg"]:
+					var pivot: Node3D = node.get_node_or_null(pivot_name)
+					if pivot != null:
+						pivot.rotation = Vector3.ZERO
+				var stripe: Node3D = node.get_node_or_null("Stripe")
+				if stripe != null:
+					stripe.visible = false
+			else:
+				node = Art.enemy(world, enemy.kind)
+			node.set_meta("kind", enemy.kind)
+			enemy_nodes[enemy.id] = node
+			enemy_kinds[enemy.id] = enemy.kind
 		var actor: Node3D = enemy_nodes[enemy.id]
 		actor.position = Vector3(enemy.lane * 2.5, 0, -enemy.z)
 		actor.rotation = Vector3.ZERO
@@ -639,6 +744,11 @@ func _sync_world(delta: float) -> void:
 			actor.position.y = 0.35
 			# Cartwheel away small: a full-size flat plate reads as a slab.
 			actor.scale = Vector3(0.62, 0.62, 0.62)
+		elif enemy.phase == "approach" and enemy.kind == "shield" and enemy.z <= 12.0:
+			# Authored wind-up: pull back before the bash lunge so the attack
+			# reads as anticipation then release.
+			actor.rotation.x = 0.14
+			actor.position.z -= 0.35
 		elif enemy.phase == "approach" and enemy.kind == "dummy":
 			# Idle sway so stacked dummies don't merge into one clump.
 			actor.rotation.z = 0.05 * sin(model.time * 3.0 + float(enemy.id))
@@ -681,8 +791,9 @@ func _sync_world(delta: float) -> void:
 			counter_ring.position = Vector3(enemy.lane * 2.5, 0.06, -enemy.z)
 	for id in enemy_nodes.keys():
 		if not live_ids.has(id):
-			enemy_nodes[id].free()
+			_release_enemy_node(enemy_kinds[id], enemy_nodes[id])
 			enemy_nodes.erase(id)
+			enemy_kinds.erase(id)
 	if model.inspector.is_empty():
 		if inspector_node != null:
 			inspector_node.free()

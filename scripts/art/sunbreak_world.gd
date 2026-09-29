@@ -1,5 +1,8 @@
 extends RefCounted
 
+## Test observability: how many enemy node trees have ever been built.
+static var created_count: int = 0
+
 const SAFFRON = Color("ffca45")
 const CORAL = Color("ec725b")
 const COBALT = Color("283e78")
@@ -90,6 +93,7 @@ static func courier(parent: Node3D) -> Node3D:
 	return actor
 
 static func enemy(parent: Node3D, kind: String) -> Node3D:
+	created_count += 1
 	var actor := Node3D.new()
 	parent.add_child(actor)
 	if kind == "barrier":

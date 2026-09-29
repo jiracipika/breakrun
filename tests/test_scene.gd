@@ -42,6 +42,23 @@ func run() -> void:
 				check(game.model.lane == 1, "UI action reaches logical movement")
 				var legend: Control = game.get_node_or_null("Interface/HUD/Legend")
 				check(legend != null and not legend.visible, "legend hides after the first action")
+				var seed_field: LineEdit = game.get_node_or_null("Interface/Title/SeedInput")
+				check(seed_field != null, "title exposes a seed input")
+				game.return_to_title()
+				if seed_field != null:
+					seed_field.text = "12345"
+					game.start_run()
+					check(game.model.state == "running" and game.model.run_seed == 12345,
+						"a typed seed replays that exact run")
+					game.return_to_title()
+					seed_field.text = "ab12cd34"
+					game.start_run()
+					check(game.model.run_seed == 1234, "garbage is stripped to its digits")
+					game.return_to_title()
+					seed_field.text = ""
+					game.start_run()
+					check(game.model.state == "running" and game.model.run_seed > 0,
+						"an empty field rolls a fresh random seed")
 				game.start_run()
 				check(legend.visible, "gesture legend shows at run start")
 				game._physics_process(6.0)
@@ -50,6 +67,25 @@ func run() -> void:
 				game.model.state = "dead"
 				game._physics_process(0.01)
 				check(game.result_overlay.visible, "death displays result screen")
+				var copy_seed: Button = game.get_node_or_null("Interface/ResultOverlay/CopySeed")
+				check(copy_seed != null, "result screen exposes a copy-seed button")
+				if copy_seed != null:
+					copy_seed.pressed.emit()
+					check(copy_seed.text.begins_with("Copied"), "copying acknowledges with feedback")
+				game.return_to_title()
+				game.start_run()
+				game.model.upgrade_offer = ["pinball", "relay"]
+				game._sync_ui()
+				var upgrade_overlay: Control = game.get_node_or_null("Interface/UpgradeOverlay")
+				check(upgrade_overlay != null and upgrade_overlay.visible,
+					"an open offer shows the perk overlay")
+				if upgrade_overlay != null and upgrade_overlay.visible:
+					# Overlay children: panel, title, subtitle, perk card 0.
+					var perk_button: Button = upgrade_overlay.get_child(3)
+					perk_button.pressed.emit()
+					check(game.model.owned_upgrades.has("pinball") and game.model.upgrade_offer.is_empty(),
+						"picking a card owns the perk and resumes")
+					check(not upgrade_overlay.visible, "the perk overlay hides after the pick")
 				game.start_run()
 				check(game.model.hp == 3 and game.model.distance == 0.0, "restart clears old run")
 			game.free()

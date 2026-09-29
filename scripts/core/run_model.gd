@@ -27,6 +27,16 @@ const INSPECTOR_HP: int = 3
 const INSPECTOR_BREAK_SCORE: int = 150
 const INSPECTOR_CLEAR_SCORE: int = 300
 const INSPECTOR_PATTERNS: Array = ["bash", "sweep", "scanner"]
+
+## Perks from design plan §5 (Springstep adapted: the boost lasts longer, since
+## lane changes are instant and a mid-air correction has no meaning here).
+const UPGRADES := {
+	"pinball": "Launched robots ricochet once into the next lane",
+	"springstep": "Courier boost lasts half again as long",
+	"streetbroom": "Launched robots fly half again as far",
+	"relay": "Launched robots passing each other pay a +50 Relay",
+	"second wind": "A flawless inspector clear restores one pip",
+}
 const STAGGER_TIME: float = 1.0
 const STAGGER_SLOWDOWN: float = 0.8
 const INPUT_BUFFER: float = 0.25
@@ -60,6 +70,10 @@ var boost_count: int = 0
 var inspector: Dictionary = {}
 var inspector_hits: int = 0
 var inspectors_defeated: int = 0
+var owned_upgrades: Array = []
+var upgrade_offer: Array = []
+var relays: Dictionary = {}
+var _inspector_damaged: bool = false
 var _stagger: float = 0.0
 var _boost: float = 0.0
 var _buffered_action: String = ""
@@ -96,6 +110,10 @@ func start(seed_value: int = 42) -> void:
 	inspector = {}
 	inspector_hits = 0
 	inspectors_defeated = 0
+	owned_upgrades = []
+	upgrade_offer = []
+	relays = {}
+	_inspector_damaged = false
 	_stagger = 0.0
 	_boost = 0.0
 	_buffered_action = ""
@@ -109,7 +127,7 @@ func start(seed_value: int = 42) -> void:
 	_spawn_wave(SPAWN_DISTANCE)
 
 func act(action: String) -> void:
-	if state != "running":
+	if state != "running" or not upgrade_offer.is_empty():
 		return
 	match action:
 		"left": lane = maxi(-1, lane - 1)
@@ -134,7 +152,7 @@ func toggle_pause() -> void:
 		state = "running"
 
 func step(delta: float) -> void:
-	if state != "running" or not is_finite(delta) or delta <= 0.0:
+	if state != "running" or not upgrade_offer.is_empty() or not is_finite(delta) or delta <= 0.0:
 		return
 	# Small bounded steps prevent collision and phase tunneling on slow frames.
 	var remaining: float = minf(delta, 1.0)
@@ -155,7 +173,7 @@ func world_speed() -> float:
 	if _stagger > 0.0:
 		factor *= 1.0 - STAGGER_SLOWDOWN * (_stagger / STAGGER_TIME)
 	if _boost > 0.0:
-		factor *= 1.0 + BOOST_MULT * (_boost / BOOST_TIME)
+		factor *= 1.0 + BOOST_MULT * (_boost / _boost_time())
 	if factor == 1.0:
 		return speed()
 	return speed() * factor
@@ -164,9 +182,17 @@ func world_speed() -> float:
 func stagger_ratio() -> float:
 	return clampf(_stagger / STAGGER_TIME, 0.0, 1.0)
 
+## Boost window, stretched by the Springstep perk.
+func _boost_time() -> float:
+	return BOOST_TIME * 1.5 if _has_perk("springstep") else BOOST_TIME
+
+## How long a launched robot stays airborne, stretched by Street broom.
+func _launched_max_age() -> float:
+	return 1.5 * 1.5 if _has_perk("streetbroom") else 1.5
+
 ## 1.0 right after an aerial strike, easing to 0.0 as the boost fades.
 func boost_ratio() -> float:
-	return clampf(_boost / BOOST_TIME, 0.0, 1.0)
+	return clampf(_boost / _boost_time(), 0.0, 1.0)
 
 ## Style multiplier: 1.0 at combo 0, +0.25 per uninterrupted success, capped at 3.0.
 func style_multiplier() -> float:
@@ -196,10 +222,39 @@ func _damage(kind: String) -> void:
 	last_hit_kind = kind
 	_stagger = STAGGER_TIME
 	_invulnerability = 1.0
+	if not inspector.is_empty():
+		_inspector_damaged = true
 	_message("Hit! Change lane before contact.", 1.5)
 	if hp <= 0:
 		state = "dead"
 		_message("Run ended. Try the recovery counter.", 999.0)
+
+func take_upgrade(name: String) -> void:
+	if upgrade_offer.has(name) and UPGRADES.has(name) and not owned_upgrades.has(name):
+		owned_upgrades.append(name)
+		upgrade_offer.clear()
+		_message("%s acquired!" % name.capitalize(), 1.4)
+
+func _draw_upgrade_offer() -> void:
+	upgrade_offer.clear()
+	var unowned: Array = []
+	for name in UPGRADES:
+		if not owned_upgrades.has(name):
+			unowned.append(name)
+	if unowned.is_empty():
+		return
+	if unowned.size() == 1:
+		upgrade_offer.append(unowned[0])
+		return
+	var first: int = _rng.randi_range(0, unowned.size() - 1)
+	var second: int = _rng.randi_range(0, unowned.size() - 2)
+	if second >= first:
+		second += 1
+	upgrade_offer.append(unowned[first])
+	upgrade_offer.append(unowned[second])
+
+func _has_perk(name: String) -> bool:
+	return owned_upgrades.has(name)
 
 ## Fire a buffered jump/slide the moment it becomes executable.
 func _try_buffered_action() -> void:
@@ -219,6 +274,7 @@ func _tick(dt: float) -> void:
 	_invulnerability = maxf(0.0, _invulnerability - dt)
 	_stagger = maxf(0.0, _stagger - dt)
 	_boost = maxf(0.0, _boost - dt)
+	_boost = minf(_boost, _boost_time())
 	_buffer_time = maxf(0.0, _buffer_time - dt)
 	if _buffer_time == 0.0:
 		_buffered_action = ""
@@ -270,8 +326,10 @@ func _tick(dt: float) -> void:
 		if projectile.phase != "launched":
 			continue
 		for target in enemies:
-			# Hurdles are only cleared by player evasion, never by projectiles.
-			if target.phase == "cleared" or target.kind == "shield" or target.kind == "hurdle" or target.lane != projectile.lane:
+			# Hurdles are only cleared by player evasion, never by projectiles;
+			# launched robots are projectiles and cannot strike anything —
+			# including themselves.
+			if target.phase == "cleared" or target.phase == "launched" or target.kind == "shield" or target.kind == "hurdle" or target.lane != projectile.lane:
 				continue
 			if target.z >= projectile.previous_z - current_speed * dt and target.z <= projectile.z + 0.5:
 				target.phase = "cleared"
@@ -280,6 +338,38 @@ func _tick(dt: float) -> void:
 					chain_count += 1
 				_reward(150 if target.kind == "barrier" else 100)
 				_message("Checkpoint cleared!" if projectile.hits >= 3 else "Chain x%d!" % projectile.hits, 1.5)
+			# Pinball: after its first strike the projectile hops one lane
+			# toward another strike-able target, once per launch.
+			if projectile.hits >= 1 and _has_perk("pinball") and not projectile["ricocheted"]:
+				for side in [1, -1]:
+					var next_lane: int = clampi(int(projectile.lane) + side, -1, 1)
+					if next_lane == int(projectile.lane):
+						continue
+					var quarry: bool = false
+					for candidate in enemies:
+						if candidate.phase != "cleared" and candidate.phase != "launched" \
+								and candidate.kind != "shield" and candidate.kind != "hurdle" \
+								and int(candidate.lane) == next_lane \
+								and candidate.z >= projectile.z - 2.0 and candidate.z <= projectile.z + 24.0:
+							quarry = true
+					if quarry:
+						projectile.lane = next_lane
+						projectile["ricocheted"] = true
+						_message("Pinball!", 1.2)
+						break
+	# Relay: launched robots that cross paths pay a one-time bonus.
+	if _has_perk("relay"):
+		var flyers: Array = []
+		for e in enemies:
+			if e.phase == "launched":
+				flyers.append(e)
+		for i in range(flyers.size()):
+			for j in range(i + 1, flyers.size()):
+				var pair: String = "%d_%d" % [mini(flyers[i].id, flyers[j].id), maxi(flyers[i].id, flyers[j].id)]
+				if not relays.has(pair) and absf(flyers[i].z - flyers[j].z) < 1.2:
+					relays[pair] = true
+					score += 50
+					_message("Relay!", 1.0)
 	for e in enemies:
 		if e.phase == "cleared" or e.phase == "launched":
 			continue
@@ -301,7 +391,7 @@ func _tick(dt: float) -> void:
 				e.phase = "cleared"
 	# No mutation of array structure during iteration.
 	enemies = enemies.filter(func(e: Dictionary) -> bool:
-		return e.z >= -5.0 and (e.phase != "launched" or e.age < 1.5))
+		return e.z >= -5.0 and (e.phase != "launched" or e.age < _launched_max_age()))
 	_tick_inspector(dt)
 	if distance >= _next_wave_distance and state == "running":
 		_spawn_wave(SPAWN_DISTANCE - (distance - _next_wave_distance))
@@ -309,6 +399,7 @@ func _tick(dt: float) -> void:
 	if inspector.is_empty() and distance >= INSPECTOR_DISTANCE * float(inspectors_defeated + 1):
 		inspector = {"lane": 0, "pattern": INSPECTOR_PATTERNS[_rng.randi_range(0, 2)],
 			"phase": "telegraph", "pattern_time": 0.0, "hits": 0, "dodged": false}
+		_inspector_damaged = false
 
 ## The checkpoint machine: telegraph a taught pattern, punish failure at the
 ## active step, open the counter window, roll the next pattern.
@@ -355,8 +446,13 @@ func _break_inspector() -> void:
 	if inspector.hits >= INSPECTOR_HP:
 		score += INSPECTOR_CLEAR_SCORE
 		inspectors_defeated += 1
-		_message("ROUTE CLEARED!", 1.6)
+		if _has_perk("second wind") and not _inspector_damaged and hp < 3:
+			hp += 1
+			_message("Second wind!", 1.6)
+		else:
+			_message("ROUTE CLEARED!", 1.6)
 		inspector = {}
+		_draw_upgrade_offer()
 	else:
 		_message("Pattern broken!  %d / %d" % [inspector.hits, INSPECTOR_HP], 1.2)
 		_next_inspector_pattern()
@@ -396,7 +492,7 @@ func _spawn_wave(z: float) -> void:
 			lane = 0 if neighbor == 1 else -1
 		enemies.append({"id": _next_id, "kind": member[0], "lane": lane,
 			"z": z + member[1], "phase": "approach", "dodged": false,
-			"age": 0.0, "hits": 0, "rewarded": false, "swept": false, "previous_z": z + member[1]})
+			"age": 0.0, "hits": 0, "rewarded": false, "swept": false, "ricocheted": false, "previous_z": z + member[1]})
 		_next_id += 1
 	_waves_spawned += 1
 
@@ -441,7 +537,7 @@ func _try_counter() -> void:
 		if nearest.kind == "spring":
 			# The courier springs away and shoves the runner forward.
 			boost_count += 1
-			_boost = BOOST_TIME
+			_boost = _boost_time()
 			_message("Boost!", 1.0)
 		else:
 			_message("Swept!" if nearest.kind == "kicker" else "Counter!", 1.0)

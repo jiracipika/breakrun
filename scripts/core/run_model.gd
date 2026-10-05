@@ -40,6 +40,15 @@ const UPGRADES := {
 const STAGGER_TIME: float = 1.0
 const STAGGER_SLOWDOWN: float = 0.8
 const INPUT_BUFFER: float = 0.25
+## Lane traversal timing. Logical lane selection is instant (act() sets lane
+## immediately) while the scene's runner visually blends toward the selected
+## lane exponentially at LANE_RATE per second (main.gd shares this constant).
+## A crossing is effectively complete — 95% of the 2.5-unit lane span — after
+## log(20)/LANE_RATE seconds, about 0.19 s. Any hazard that demands a lane
+## switch must leave at least this long, or it asks the player to be somewhere
+## their runner is visibly not yet.
+const LANE_RATE: float = 16.0
+const LANE_TRAVERSAL_TIME: float = log(20.0) / LANE_RATE
 # Wave archetypes: [kind, z offset]. Checkpoint is the teaching chain wave;
 # patrol and fence vary lanes while keeping one shield and readable spacing.
 const CHECKPOINT_WAVE: Array = [["shield", 0.0], ["dummy", 6.0], ["dummy", 12.0], ["barrier", 18.0], ["hurdle", 24.0]]
@@ -457,6 +466,47 @@ func _break_inspector() -> void:
 		_message("Pattern broken!  %d / %d" % [inspector.hits, INSPECTOR_HP], 1.2)
 		_next_inspector_pattern()
 
+## Lane assignment for every member of an archetype wave given its target lane.
+## The one source of truth for both spawning and reachability checks, so a
+## future layout change cannot make them disagree.
+static func wave_member_lanes(archetype: Array, target_lane: int) -> Array:
+	var neighbor: int = clampi(target_lane + (1 if target_lane <= 0 else -1), -1, 1)
+	var lanes: Array = []
+	for i in range(archetype.size()):
+		var lane: int = target_lane
+		if archetype == PATROL_WAVE and i == 2:
+			lane = neighbor
+		elif archetype == SWEEP_WAVE and i == 1:
+			lane = neighbor
+		elif archetype == SPRING_WAVE and (i == 1 or i == 2):
+			lane = neighbor
+		elif archetype == FENCE_WAVE and i == 1:
+			lane = neighbor
+		elif archetype == FENCE_WAVE and i == 2:
+			lane = 0 if neighbor == 1 else -1
+		lanes.append(lane)
+	return lanes
+
+## Kinds whose only grounded answer is "not this lane" when the member arrives.
+## Hurdles are answered in place (jump/slide), and the kicker/spring sweeps keep
+## an in-lane verb (slide/jump), so none of them strictly demand a lane switch.
+static func kind_locks_lane(kind: String) -> bool:
+	return kind == "shield" or kind == "dummy" or kind == "barrier"
+
+## Shortest time a wave layout demands for a lane switch: the closest pair of
+## consecutive lane-locked members placed in different lanes, measured at the
+## speed cap (the fastest the world ever moves, so the shortest real window).
+## INF when no pair in the layout demands a switch at all.
+static func wave_switch_window(archetype: Array, target_lane: int) -> float:
+	var lanes := wave_member_lanes(archetype, target_lane)
+	var window: float = INF
+	for i in range(archetype.size() - 1):
+		if kind_locks_lane(archetype[i][0]) and kind_locks_lane(archetype[i + 1][0]) \
+				and int(lanes[i]) != int(lanes[i + 1]):
+			var gap: float = float(archetype[i + 1][1] - archetype[i][1]) / MAX_SPEED
+			window = minf(window, gap)
+	return window
+
 func _spawn_wave(z: float) -> void:
 	# The first two waves teach the checkpoint chain; later waves draw an
 	# archetype from the seed so runs vary while staying readable and fair.
@@ -476,21 +526,16 @@ func _spawn_wave(z: float) -> void:
 				archetype = SPRING_WAVE
 			4:
 				pass
-	var neighbor: int = clampi(target_lane + (1 if target_lane <= 0 else -1), -1, 1)
+	# Reachability gate before hazards combine: a layout that demanded a lane
+	# switch faster than the visual traversal allows must never ship. Stripped
+	# from release exports; tests/test_traversal.gd checks the same invariant
+	# explicitly across every archetype and target lane.
+	assert(wave_switch_window(archetype, target_lane) >= LANE_TRAVERSAL_TIME,
+		"wave demands a lane switch faster than lane traversal allows")
+	var lanes := wave_member_lanes(archetype, target_lane)
 	for i in range(archetype.size()):
 		var member: Array = archetype[i]
-		var lane: int = target_lane
-		if archetype == PATROL_WAVE and i == 2:
-			lane = neighbor
-		elif archetype == SWEEP_WAVE and i == 1:
-			lane = neighbor
-		elif archetype == SPRING_WAVE and (i == 1 or i == 2):
-			lane = neighbor
-		elif archetype == FENCE_WAVE and i == 1:
-			lane = neighbor
-		elif archetype == FENCE_WAVE and i == 2:
-			lane = 0 if neighbor == 1 else -1
-		enemies.append({"id": _next_id, "kind": member[0], "lane": lane,
+		enemies.append({"id": _next_id, "kind": member[0], "lane": lanes[i],
 			"z": z + member[1], "phase": "approach", "dodged": false,
 			"age": 0.0, "hits": 0, "rewarded": false, "swept": false, "ricocheted": false, "previous_z": z + member[1]})
 		_next_id += 1

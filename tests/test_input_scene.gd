@@ -125,6 +125,13 @@ func run() -> void:
 	game._sync_ui()
 	key(KEY_ESCAPE)
 	check(game.model.state == "title", "Escape returns to title from the result screen")
+	game.model.state = "dead"
+	game._sync_ui()
+	key(KEY_C)
+	check(game.get_node("Interface/ResultOverlay/CopySeed").text.begins_with("Copied"),
+		"C copies the seed from the result screen")
+	key(KEY_ENTER)
+	check(game.model.state == "running", "restart keys still work after copying")
 	# Touch ergonomics: panels pass drags through; menus still fire on touch-down.
 	game.start_run()
 	touch(0, Vector2(240, 180), true)

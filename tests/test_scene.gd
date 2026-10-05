@@ -72,6 +72,11 @@ func run() -> void:
 				if copy_seed != null:
 					copy_seed.pressed.emit()
 					check(copy_seed.text.begins_with("Copied"), "copying acknowledges with feedback")
+				var seed_shown: LineEdit = game.get_node_or_null("Interface/ResultOverlay/SeedDisplay")
+				check(seed_shown != null and seed_shown.text == str(game.model.run_seed),
+					"result screen shows the run seed as its own selectable text")
+				check(seed_shown == null or (not seed_shown.editable and seed_shown.select_all_on_focus),
+					"the seed display selects itself on focus for manual copying")
 				game.return_to_title()
 				game.start_run()
 				game.model.upgrade_offer = ["pinball", "relay"]

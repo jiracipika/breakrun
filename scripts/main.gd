@@ -21,6 +21,7 @@ var legend: Panel
 var _legend_age: float = 0.0
 var _legend_done: bool = false
 var seed_input: LineEdit
+var seed_display: LineEdit
 var copy_seed_button: Button
 var copy_seed_timer: float = 0.0
 var camera: Camera3D
@@ -277,6 +278,33 @@ func _build_overlays() -> void:
 	result_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	copy_seed_button = button(result_overlay, "COPY SEED", Rect2(48, 510, 200, 38), copy_seed)
 	copy_seed_button.name = "CopySeed"
+	# The seed as selectable text: the honest fallback when a context refuses
+	# clipboard writes — click it (or press C) and the digits select themselves
+	# for Ctrl+C / long-press copy.
+	seed_display = LineEdit.new()
+	seed_display.name = "SeedDisplay"
+	seed_display.text = ""
+	seed_display.editable = false
+	seed_display.select_all_on_focus = true
+	seed_display.context_menu_enabled = false
+	seed_display.position = Vector2(260, 510)
+	seed_display.size = Vector2(232, 38)
+	seed_display.max_length = 12
+	seed_display.add_theme_font_size_override("font_size", 17)
+	seed_display.add_theme_color_override("font_color", GOLD)
+	seed_display.add_theme_color_override("font_uneditable_color", GOLD)
+	seed_display.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var display_style := StyleBoxFlat.new()
+	display_style.bg_color = PANEL
+	display_style.border_color = Color("39394f")
+	display_style.set_border_width_all(1)
+	display_style.set_corner_radius_all(8)
+	seed_display.add_theme_stylebox_override("normal", display_style)
+	var display_focus := display_style.duplicate()
+	display_focus.border_color = PAPER
+	display_focus.set_border_width_all(2)
+	seed_display.add_theme_stylebox_override("focus", display_focus)
+	result_overlay.add_child(seed_display)
 	button(result_overlay, "RUN AGAIN   →", Rect2(48, 558, 444, 58), start_run, true)
 	button(result_overlay, "BACK TO TITLE", Rect2(48, 626, 444, 60), return_to_title)
 	result_overlay.visible = false
@@ -299,17 +327,53 @@ func pick_perk(index: int) -> void:
 		model.take_upgrade(model.upgrade_offer[index])
 		_sync_ui()
 
-## Put the shown seed on the clipboard so sharing needs no retyping. Web gets
-## the async navigator API (HTTPS + this tap gesture satisfy its rules);
-## native builds use the display server. Acknowledge either way.
+## Put the shown seed on the clipboard so sharing needs no retyping. Web uses
+## the async navigator API where it exists (HTTPS plus this press gesture
+## satisfy its rules) and falls back to a hidden textarea + execCommand copy
+## for plain file:// and other non-secure contexts where the clipboard is
+## unavailable; native builds use the display server. If every write path is
+## refused, the button never claims "Copied!" — it asks for Ctrl+C and selects
+## the seed field instead, so the digits are one keystroke away.
 func copy_seed() -> void:
 	var seed_text: String = str(model.run_seed)
+	var copied: bool = false
 	if OS.has_feature("web"):
-		JavaScriptBridge.eval("navigator.clipboard.writeText('%s');" % seed_text, true)
+		# One-shot probe run inside the page: prefer the async clipboard API on
+		# secure origins; anywhere else (plain file:// among them) fall back to
+		# a hidden textarea + execCommand inside the same gesture. Kept flush
+		# on purpose: GDScript has no strip_margin to dedent this safely.
+		var js: String = """
+(function(text) {
+try {
+if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+navigator.clipboard.writeText(text);
+return true;
+}
+var area = document.createElement('textarea');
+area.value = text;
+area.setAttribute('readonly', '');
+area.style.position = 'fixed';
+area.style.opacity = '0';
+document.body.appendChild(area);
+area.focus();
+area.select();
+var ok = document.execCommand('copy');
+document.body.removeChild(area);
+return ok;
+} catch (error) {
+return false;
+}
+})(%d)""" % model.run_seed
+		copied = bool(JavaScriptBridge.eval(js, true))
 	else:
 		DisplayServer.clipboard_set(seed_text)
-	copy_seed_button.text = "Copied!"
-	copy_seed_timer = 1.5
+		copied = true  # The platform API has no failure signal on desktop.
+	if copied:
+		copy_seed_button.text = "Copied!"
+	else:
+		copy_seed_button.text = "PRESS CTRL+C"
+		seed_display.grab_focus()  # select_all_on_focus selects the digits.
+	copy_seed_timer = 1.5 if copied else 2.5
 
 func _tick_copy_feedback(delta: float) -> void:
 	if copy_seed_timer > 0.0:
@@ -421,6 +485,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		elif model.state == "dead" and (code == KEY_ENTER or code == KEY_SPACE or code == KEY_R):
 			start_run()
+			get_viewport().set_input_as_handled()
+		elif model.state == "dead" and code == KEY_C:
+			copy_seed()
 			get_viewport().set_input_as_handled()
 		elif model.state == "running":
 			var actions: Dictionary = {KEY_A: "left", KEY_LEFT: "left", KEY_D: "right", KEY_RIGHT: "right", KEY_W: "jump", KEY_UP: "jump", KEY_S: "slide", KEY_DOWN: "slide", KEY_SPACE: "attack"}
@@ -609,6 +676,8 @@ func _sync_ui() -> void:
 		perks += name.capitalize() + " "
 	if perks != "":
 		perks = " · " + perks.strip_edges()
+	if seed_display.text != str(model.run_seed):
+		seed_display.text = str(model.run_seed)  # Kept so a selection survives the frame.
 	result_label.text = "%d points · %d metres%s\nCounters %d · Chains %d · best ×%.2f\nBest: %d · Seed %d%s\n%s" % [model.score, int(model.distance), best_mark, model.counter_count, model.chain_count, model.style_multiplier(), best_score, model.run_seed, perks, _failure_line()]
 	var text: String = "Move out of the shield's lane when it winds up."
 	var ready_to_counter: bool = false
@@ -669,7 +738,9 @@ func _sync_ui() -> void:
 		instruction.modulate.a = 1.0
 
 func _sync_world(delta: float) -> void:
-	var blend: float = minf(1.0, delta * 16.0)
+	# The runner crosses lanes exponentially at the model's shared LANE_RATE;
+	# run_model.gd derives the traversal window every hazard must respect.
+	var blend: float = minf(1.0, delta * Model.LANE_RATE)
 	runner.position.x = lerpf(runner.position.x, model.lane * 2.5, blend)
 	runner.position.y = model.height
 	runner.scale.y = 0.55 if model.sliding else 1.0

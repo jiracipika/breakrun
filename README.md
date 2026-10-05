@@ -30,7 +30,7 @@ The whole screen is the controller, like other runners:
 
 - Swipe anywhere: left/right to change lane, up to jump, down to slide.
 - Tap anywhere: counter a shield after dodging its bash. A tap with no counter ready just shows a hint — it is never penalized.
-- Escape: pause/resume. Enter/Space/R: run again from the result screen; Escape there returns to the title.
+- Escape: pause/resume. Enter/Space/R: run again from the result screen; C there copies the seed; Escape there returns to the title.
 - Keyboard: A/D or arrows, W/up jump, S/down slide, Space counter.
 - Touch: everything above works by gesture; menu buttons (Start, Pause, Run again) stay as buttons. UI touches must not also move the player.
 

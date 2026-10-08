@@ -3,6 +3,7 @@ extends Node3D
 const Art = preload("res://scripts/art/sunbreak_world.gd")
 const Model = preload("res://scripts/core/run_model.gd")
 const Gestures = preload("res://scripts/input/gesture_router.gd")
+const MusicBox = preload("res://scripts/core/music_box.gd")
 const INK = Color("0a0a0f")
 const PANEL = Color("1c1c2e")
 const PAPER = Color("fff4db")
@@ -54,6 +55,9 @@ var previous_hp: int = 3
 var best_score: int = 0
 var muted: bool = false
 var audio_players: Dictionary = {}
+var music_player: AudioStreamPlayer
+var menu_music: AudioStreamWAV
+var run_music: AudioStreamWAV
 var last_sound_feedback: String = ""
 ## Deterministic-run hook for tests and rendered capture. 0 = each run draws a fresh seed.
 var fixed_seed: int = 0
@@ -264,6 +268,7 @@ func _build_overlays() -> void:
 	sound.button_pressed = not muted
 	sound.toggled.connect(func(value: bool) -> void:
 		muted = not value
+		_apply_music()
 		_save_settings())
 	pause_overlay.add_child(sound)
 	button(pause_overlay, "BACK TO TITLE", Rect2(48, 615, 444, 60), return_to_title)
@@ -538,10 +543,35 @@ func _build_audio() -> void:
 		player.volume_db = -8.0
 		add_child(player)
 		audio_players[name] = player
+	# The soundtrack: two synthesized loops (menu idles mellow, the run loop
+	# brings drums and the lead hook) on their own player, under the blips.
+	menu_music = MusicBox.make_menu_loop()
+	run_music = MusicBox.make_run_loop()
+	music_player = AudioStreamPlayer.new()
+	music_player.volume_db = -7.0
+	music_player.stream = menu_music
+	add_child(music_player)
+	_apply_music()
 
 func play_sound(name: String) -> void:
 	if not muted and audio_players.has(name):
 		audio_players[name].play()
+
+## Keep the soundtrack on the right loop for the model state, honoring mute.
+## _sync_ui calls this every physics frame; every branch is idempotent.
+func _apply_music() -> void:
+	if music_player == null:
+		return
+	var in_run: bool = model.state == "running" or model.state == "paused"
+	var wanted: AudioStreamWAV = run_music if in_run else menu_music
+	if music_player.stream != wanted:
+		music_player.stream = wanted
+	if muted:
+		music_player.stop()
+		return
+	if not music_player.playing:
+		music_player.play()
+	music_player.stream_paused = model.state == "paused"
 
 func _settings_path() -> String:
 	return "user://breakrun.cfg"
@@ -655,6 +685,7 @@ func _sync_ui() -> void:
 	hud.visible = model.state != "title"
 	pause_overlay.visible = model.state == "paused"
 	result_overlay.visible = model.state == "dead"
+	_apply_music()
 	upgrade_overlay.visible = not model.upgrade_offer.is_empty()
 	if upgrade_overlay.visible:
 		for i in range(perk_buttons.size()):

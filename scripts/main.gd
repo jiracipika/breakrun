@@ -51,6 +51,7 @@ var reduced_motion: bool = false
 var _web_status_elapsed: float = 0.0
 var hit_flash: ColorRect
 var hit_flash_time: float = 0.0
+var slide_scale: float = 1.0
 var previous_hp: int = 3
 var best_score: int = 0
 var muted: bool = false
@@ -601,9 +602,9 @@ func _physics_process(delta: float) -> void:
 		model.step(delta)
 		_sync_world(delta)
 	# Feedback events are level-side: compare previous presentation state.
-	if model.counter_count > previous_counters:
-		previous_counters = model.counter_count
-		play_sound("counter")
+	# The counter sound lives in _sync_world's counter branch — it used to be
+	# checked here, after _sync_world had already consumed previous_counters,
+	# so it could never fire.
 	if model.boost_count > previous_boosts:
 		previous_boosts = model.boost_count
 		play_sound("boost")
@@ -754,6 +755,11 @@ func _sync_ui() -> void:
 					text = "COUNTER NOW  ·  tap anywhere"
 					ready_to_counter = absi(int(e.lane) - model.lane) <= 1
 			break
+	# The next checkpoint machine announces itself so it never arrives cold.
+	if model.feedback == "" and model.inspector.is_empty():
+		var next_at: float = Model.INSPECTOR_DISTANCE * float(model.inspectors_defeated + 1)
+		if model.distance >= next_at - 40.0:
+			text = "INSPECTOR AHEAD — reach the checkpoint"
 	if model.feedback != "":
 		text = model.feedback
 		if text.begins_with("Chain") and last_sound_feedback != text + str(model.chain_count):
@@ -774,7 +780,9 @@ func _sync_world(delta: float) -> void:
 	var blend: float = minf(1.0, delta * Model.LANE_RATE)
 	runner.position.x = lerpf(runner.position.x, model.lane * 2.5, blend)
 	runner.position.y = model.height
-	runner.scale.y = 0.55 if model.sliding else 1.0
+	# Slide settles in and out at the lane-blend ease instead of snapping.
+	slide_scale = lerpf(slide_scale, 0.55 if model.sliding else 1.0, blend * 1.6)
+	runner.scale.y = slide_scale
 	# Stumble feedback: lean back, drop stride, nudge toward the camera.
 	var stagger: float = model.stagger_ratio() if model.state == "running" else 0.0
 	runner.rotation.x = -0.5 * stagger
@@ -787,6 +795,7 @@ func _sync_world(delta: float) -> void:
 	if model.counter_count > previous_counters:
 		kick_timer = 0.32
 		previous_counters = model.counter_count
+		play_sound("counter")
 		if not reduced_motion:
 			_spawn_burst()
 	kick_timer = maxf(0.0, kick_timer - delta)
@@ -796,14 +805,24 @@ func _sync_world(delta: float) -> void:
 		runner.rotation.x = 0.18
 		runner.rotation.z = 0.23 * (model.lane - model.last_counter_lane)
 	else:
-		runner.rotation.z = 0.0
+		# Lane-change lean: tilt into the lateral blend while crossing.
+		runner.rotation.z = clampf((model.lane * 2.5 - runner.position.x) * 0.12, -0.24, 0.24)
 	_tick_copy_feedback(delta)
 	# Counter kick punches the view wider; a boost eases it wider still.
 	var fov_kick: float = 0.0
 	if kick_timer > 0 and not reduced_motion:
 		fov_kick = 6.0 * (kick_timer / 0.32)
 	var fov_boost: float = 0.0 if reduced_motion else 4.0 * model.boost_ratio()
-	camera.fov = 62.0 + fov_kick + fov_boost
+	# Impact punch: the view jolts while the hit flash decays.
+	var fov_hit: float = 0.0 if reduced_motion else 3.0 * maxf(0.0, hit_flash_time) / 0.22
+	camera.fov = 62.0 + fov_kick + fov_boost + fov_hit
+	if hit_flash_time > 0.0 and not reduced_motion:
+		var shake: float = 0.045 * (hit_flash_time / 0.22)
+		camera.h_offset = randf_range(-shake, shake)
+		camera.v_offset = randf_range(-shake, shake)
+	else:
+		camera.h_offset = 0.0
+		camera.v_offset = 0.0
 	_update_bursts(delta)
 	var index: int = 0
 	for tile in world.get_node("Tiles").get_children():
@@ -881,7 +900,10 @@ func _sync_world(delta: float) -> void:
 			actor.rotation.x = 0.26
 		# Warn only for an approaching shield: a launched one re-enters this
 		# z band flying away and must not resurrect the dodge warning.
-		if enemy.kind == "shield" and enemy.phase == "approach" and enemy.z <= 12 and enemy.z > 6:
+		if (enemy.kind == "shield" and enemy.phase == "approach" and enemy.z <= 12 and enemy.z > 6) \
+				or (enemy.kind == "spring" and enemy.phase == "approach" and enemy.z <= 16 and enemy.z > 6):
+			# Lane paint warns for the bash AND the low sweep — the spring's
+			# crouch alone reads too late at run speed.
 			warning_lane.visible = true
 			warning_lane.position = Vector3(enemy.lane * 2.5, -0.04, -3.0)
 		if enemy.kind == "kicker":

@@ -19,8 +19,10 @@ func finish(id: int, position: Vector2) -> String:
 	cancel()
 	if difference.length() < 32.0:
 		return ""
-	if absf(difference.x) > absf(difference.y) * 1.15:
+	# Every deliberate swipe snaps to its dominant axis; dropping a near-45°
+	# gesture would fire a tap attack and leave the runner in the wrong lane.
+	# Exact ties break vertical — a jump/slide misfire beats a lane change
+	# into traffic.
+	if absf(difference.x) > absf(difference.y):
 		return "right" if difference.x > 0 else "left"
-	if absf(difference.y) > absf(difference.x) * 1.15:
-		return "slide" if difference.y > 0 else "jump"
-	return ""
+	return "slide" if difference.y > 0 else "jump"

@@ -13,7 +13,7 @@ func check(value: bool, message: String) -> void:
 func _init() -> void:
 	var router = Router.new()
 	var origin := Vector2(200, 400)
-	for case in [[Vector2(100, 0), "right"], [Vector2(-100, 0), "left"], [Vector2(0, -100), "jump"], [Vector2(0, 100), "slide"], [Vector2(10, 0), ""], [Vector2(80, 80), ""], [Vector2.ZERO, ""]]:
+	for case in [[Vector2(100, 0), "right"], [Vector2(-100, 0), "left"], [Vector2(0, -100), "jump"], [Vector2(0, 100), "slide"], [Vector2(10, 0), ""], [Vector2(80, 80), "slide"], [Vector2(80, 70), "right"], [Vector2(70, 80), "slide"], [Vector2(60, -70), "jump"], [Vector2.ZERO, ""]]:
 		router.begin(0, origin)
 		check(router.finish(0, origin + case[0]) == case[1], "gesture classification %s" % case[0])
 	check(router.finish(0, origin + Vector2(100, 0)) == "", "release only produces an action once")

@@ -70,6 +70,7 @@ static func limb(parent: Node3D, id: String, pivot: Vector3, size: Vector3, colo
 	var joint := Node3D.new()
 	joint.name = id
 	joint.position = pivot
+	joint.set_meta("home", pivot)  # pool reuse restores this; telegraphs mutate position/scale
 	parent.add_child(joint)
 	box(joint, size, Vector3(0, -size.y * 0.5, 0), color)
 	return joint

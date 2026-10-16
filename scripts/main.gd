@@ -848,6 +848,9 @@ func _sync_world(delta: float) -> void:
 					var pivot: Node3D = node.get_node_or_null(pivot_name)
 					if pivot != null:
 						pivot.rotation = Vector3.ZERO
+						pivot.scale = Vector3.ONE
+						if pivot.has_meta("home"):
+							pivot.position = pivot.get_meta("home")
 				var stripe: Node3D = node.get_node_or_null("Stripe")
 				if stripe != null:
 					stripe.visible = false
@@ -880,17 +883,34 @@ func _sync_world(delta: float) -> void:
 				actor.rotation.z = PI * 0.48
 				actor.scale = Vector3(0.45, 0.45, 0.45)
 		elif enemy.phase == "sweep":
-			# High stamp: the saffron foot swings through the lane.
+			# High stamp: the saffron foot swings through the lane while the
+			# body lunges into the strike.
 			var kicker_foot: Node3D = actor.get_node_or_null("Foot")
 			if kicker_foot != null:
 				kicker_foot.rotation.x = -1.9 - 0.5 * sin(model.time * 20.0)
-			# Low sweep: the courier's coil leg rakes the ground.
+				actor.position.z += 0.32
+			# Low sweep: the courier's coil leg stretches into a reaching
+			# rake, body pitched into the kick.
 			var spring_leg: Node3D = actor.get_node_or_null("SweepLeg")
 			if spring_leg != null:
 				spring_leg.rotation.x = 1.2 + 0.4 * sin(model.time * 22.0)
+				spring_leg.scale = Vector3(1.3, 1.45, 1.3)
+				actor.rotation.x = -0.14
+				actor.position.z += 0.38
+		elif enemy.kind == "kicker" and enemy.phase == "approach" and enemy.z <= 14.0:
+			# Authored wind-up: the stamp foot rears up as the range closes,
+			# so the sweep reads as release, not teleport.
+			var ramp: float = 1.0 - clampf(enemy.z / 14.0, 0.0, 1.0)
+			var foot: Node3D = actor.get_node_or_null("Foot")
+			if foot != null:
+				foot.rotation.x = 0.85 * ramp
+				var home: Vector3 = foot.get_meta("home")
+				foot.position.y = home.y + 0.5 * ramp
+			actor.rotation.x = 0.10 * ramp
 		elif enemy.kind == "spring" and enemy.phase == "approach" and enemy.z <= 16.0:
-			# Coil crouches to telegraph the low sweep.
-			actor.scale.y = 0.72
+			# Coil crouches deeper as the range closes: the squash IS the
+			# telegraph for the low sweep.
+			actor.scale.y = 0.66 + 0.06 * clampf(enemy.z / 16.0, 0.0, 1.0)
 		elif enemy.phase == "bash":
 			# Forward lunge wind-up: rocks toward the player as it attacks.
 			actor.rotation.x = -0.20 - 0.16 * sin(model.time * 18.0)
